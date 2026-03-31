@@ -74,11 +74,16 @@ publish
 publish
   .command('video')
   .description('发布视频')
-  .requiredOption('--title <title>', '视频标题')
   .requiredOption('--file <path>', '视频文件路径')
+  .requiredOption('--title <title>', '视频标题')
+  .option('--topic <topic>', '话题名称（不含 #）')
   .option('--cover <path>', '封面图片路径')
-  .option('--description <desc>', '视频描述')
-  .option('--tags <tags>', '标签，逗号分隔')
+  .option('--description <desc>', '视频简介')
+  .option('--gen-article', '勾选"生成图文"获取额外图文创作收益')
+  .option('--collection <name>', '添加至合集名称')
+  .option('--declaration <items>', '作品声明，逗号分隔: 取自站外,引用站内,自行拍摄,AI生成,虚构演绎,投资观点,健康医疗')
+  .option('--visibility <mode>', '谁可以看: public / fans / private', 'public')
+  .option('--draft', '存为草稿而非直接发布')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
     await run(publishVideo, opts);
