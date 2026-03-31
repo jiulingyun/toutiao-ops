@@ -249,6 +249,29 @@ async function extractFansDistributions(page) {
       }
     }
 
+    // --- 粉丝偏好：粉丝看过的作品 ---
+    const articleItems = document.querySelectorAll('.fans-interest-article-container .article-item');
+    if (articleItems.length > 0) {
+      result.fansViewedWorks = [...articleItems].map(item => {
+        const title = item.querySelector('.article-item-title')?.innerText?.trim() || '';
+        const desc = item.querySelector('.article-item-desc')?.innerText?.trim() || '';
+        const cover = item.querySelector('.article-item-cover img')?.src || '';
+        const viewMatch = desc.match(/(\d+)\s*次/);
+        return { title, views: viewMatch ? parseInt(viewMatch[1]) : 0, cover };
+      }).filter(w => w.title);
+    }
+
+    // --- 粉丝偏好：粉丝关注的作者 ---
+    const authorItems = document.querySelectorAll('.fans-interest-author .media-item');
+    if (authorItems.length > 0) {
+      result.fansFollowedAuthors = [...authorItems].map(item => {
+        const name = item.querySelector('.media-name')?.innerText?.trim() || '';
+        const avatar = item.querySelector('.media-avatar')?.src || '';
+        const link = item.href || '';
+        return { name, avatar, link };
+      }).filter(a => a.name);
+    }
+
     return result;
   });
 }
