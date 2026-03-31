@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { checkLogin, doLogin } from './src/auth.js';
+import { checkLogin, doLogin, doLogout } from './src/auth.js';
 import { publishArticle } from './src/publish-article.js';
 import { publishVideo } from './src/publish-video.js';
 import { publishWeitoutiao } from './src/publish-weitoutiao.js';
@@ -33,6 +33,13 @@ auth
   .description('打开浏览器手动扫码登录')
   .action(async (opts) => {
     await run(doLogin, opts);
+  });
+
+auth
+  .command('logout')
+  .description('清除登录缓存（退出登录，用于切换账号）')
+  .action(async (opts) => {
+    await run(doLogout, opts);
   });
 
 // ── publish ──

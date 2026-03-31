@@ -12,6 +12,7 @@ metadata:
     commands:
       auth check: node {baseDir}/cli/index.js auth check
       auth login: node {baseDir}/cli/index.js auth login
+      auth logout: node {baseDir}/cli/index.js auth logout
       publish article: node {baseDir}/cli/index.js publish article
       publish video: node {baseDir}/cli/index.js publish video
       publish weitoutiao: node {baseDir}/cli/index.js publish weitoutiao
@@ -61,7 +62,8 @@ metadata:
 | 命令 | 说明 |
 |------|------|
 | `auth check` | 检测登录状态 |
-| `auth login` | 打开浏览器手动扫码登录 |
+| `auth login` | 扫码登录（输出二维码截图路径，需展示给用户） |
+| `auth logout` | 清除登录缓存（退出登录 / 切换账号） |
 | `publish article --title "..." --content "..."` | 发布图文文章 |
 | `publish video --title "..." --file "path"` | 发布视频 |
 | `publish weitoutiao --content "..."` | 发布微头条 |

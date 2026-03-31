@@ -1,7 +1,7 @@
 import { launchBrowser, closeBrowser, sleep, waitForStable } from './browser.js';
 import { homedir } from 'os';
 import { join } from 'path';
-import { mkdirSync } from 'fs';
+import { mkdirSync, rmSync, existsSync } from 'fs';
 
 const MP_HOME = 'https://mp.toutiao.com/';
 const LOGIN_PATH = '/auth/page/login';
@@ -246,4 +246,29 @@ async function extractUserInfo(page) {
   } catch {
     return { username: '', avatar: '', userId: '', profileUrl: '', url: page.url() };
   }
+}
+
+/**
+ * 清除浏览器缓存和会话数据（退出登录）。
+ * 删除持久化上下文目录和截图目录，下次操作需重新扫码登录。
+ */
+export async function doLogout() {
+  const browserDataDir = join(homedir(), '.toutiao-ops', 'browser-data');
+  const cleared = [];
+
+  if (existsSync(browserDataDir)) {
+    rmSync(browserDataDir, { recursive: true, force: true });
+    cleared.push('browser-data');
+  }
+
+  if (existsSync(SCREENSHOT_DIR)) {
+    rmSync(SCREENSHOT_DIR, { recursive: true, force: true });
+    cleared.push('screenshots');
+  }
+
+  return {
+    success: true,
+    message: '已清除登录缓存，下次操作需重新扫码登录',
+    cleared,
+  };
 }

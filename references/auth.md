@@ -79,6 +79,26 @@ node {baseDir}/cli/index.js auth login
 4. 解析到 `logged_in: true` 时，登录完成
 5. 如果命令以非零退出码结束，说明登录超时（5 分钟内未完成扫码）
 
+## 退出登录 / 切换账号
+
+```bash
+node {baseDir}/cli/index.js auth logout
+```
+
+清除所有浏览器缓存和会话数据（`~/.toutiao-ops/browser-data/` 和截图目录），下次操作需重新扫码登录。
+
+输出示例：
+
+```json
+{
+  "success": true,
+  "message": "已清除登录缓存，下次操作需重新扫码登录",
+  "cleared": ["browser-data", "screenshots"]
+}
+```
+
+切换账号流程：先执行 `auth logout`，再执行 `auth login`。
+
 ## 会话持久化
 
 - 使用 Playwright `launchPersistentContext` 持久化浏览器状态
@@ -90,5 +110,6 @@ node {baseDir}/cli/index.js auth login
 
 - 任何其他操作前，都应先调用 `auth check` 确认登录状态
 - 如果未登录，执行 `auth login` 并将二维码截图展示给用户
+- 切换账号：先 `auth logout` 再 `auth login`
 - 不要同时运行多个命令（会争抢浏览器上下文锁文件）
 - 二维码有效期约 60 秒，CLI 会自动刷新，每次刷新都会输出新截图路径
