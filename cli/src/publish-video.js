@@ -125,16 +125,35 @@ export async function publishVideo(opts) {
     // ═══════════════════════════════════
     await dismissOverlays(page);
 
+    // 调试截图：发布前状态
+    const { getScreenshotDir } = await import('./browser.js');
+    const { mkdirSync } = await import('fs');
+    const debugDir = getScreenshotDir(opts.account);
+    mkdirSync(debugDir, { recursive: true });
+    const beforePath = `${debugDir}/video-before-publish-${Date.now()}.png`;
+    await page.screenshot({ path: beforePath, fullPage: true });
+    console.error(JSON.stringify({ debug_before: beforePath }));
+
     if (opts.draft) {
       const draftBtn = page.locator('button:has-text("存草稿")').first();
-      await draftBtn.click({ timeout: 10000 });
+      await draftBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await sleep(300, 500);
+      await draftBtn.click({ force: true, timeout: 10000 });
     } else {
+      // "发布"按钮在底部最右侧，用 last() 避免匹配到其他元素
       const publishBtn = page.locator('button:has-text("发布")').last();
-      await publishBtn.click({ timeout: 10000 });
+      await publishBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await sleep(300, 500);
+      await publishBtn.click({ force: true, timeout: 10000 });
     }
 
     await sleep(3000, 5000);
     await waitForStable(page);
+
+    // 调试截图：发布后状态
+    const afterPath = `${debugDir}/video-after-publish-${Date.now()}.png`;
+    await page.screenshot({ path: afterPath, fullPage: true });
+    console.error(JSON.stringify({ debug_after: afterPath, final_url: page.url() }));
 
     return {
       success: true,
@@ -192,42 +211,130 @@ async function setDeclarations(page, declarationStr) {
 }
 
 async function handleVideoCover(page, coverPath) {
-  if (coverPath) {
-    // 用户提供了封面图片，上传
-    try {
-      const coverTrigger = page.locator('text=上传封面').first();
-      await coverTrigger.click({ timeout: 5000 });
-      await sleep(500, 1000);
-      const imgInput = page.locator('input[type="file"][accept*="image"]').first();
-      await imgInput.setInputFiles(coverPath);
-      await sleep(3000, 5000);
-      const confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认")').first();
-      await confirmBtn.click({ timeout: 10000 }).catch(() => {});
-      await sleep(1000, 2000);
-    } catch {}
-  } else {
-    // 没有提供封面，尝试使用"建议的封面"中的第一帧
-    try {
-      const suggestLink = page.locator('text=建议的封面').first();
-      await suggestLink.click({ timeout: 5000 });
-      await sleep(1500, 2500);
+  // 点击"上传封面"打开封面对话框
+  const coverTrigger = page.locator('text=上传封面').first();
+  await coverTrigger.click({ timeout: 5000 }).catch(() => {});
+  await sleep(1500, 2500);
 
-      // 在弹出的封面选择面板中，点击第一个推荐的封面
-      const firstFrame = page.locator('[class*="cover-item"], [class*="thumb"], [class*="frame"], [class*="recommend"] img').first();
-      await firstFrame.click({ timeout: 5000 });
-      await sleep(500, 1000);
+  if (coverPath) {
+    // 用户提供了封面图片 → 切到"本地上传" tab
+    try {
+      const localTab = page.locator('text=本地上传').first();
+      await localTab.click({ timeout: 5000 });
+      await sleep(800, 1200);
+
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 10000 }),
+        page.locator('text=本地上传').nth(1).click({ timeout: 5000 }).catch(() => {
+          // 如果第二个"本地上传"不存在，可能 tab 切换后有上传按钮
+          return page.locator('button:has-text("上传"), text=点击上传').first().click({ timeout: 5000 });
+        }),
+      ]).catch(() => [null]);
+
+      if (fileChooser) {
+        await fileChooser.setFiles(coverPath);
+        await sleep(3000, 5000);
+      }
+
+      // 点击"下一步"或"确定"
+      const nextBtn = page.locator('button:has-text("下一步")').first();
+      const nextVisible = await nextBtn.isVisible().catch(() => false);
+      if (nextVisible) {
+        await nextBtn.click({ timeout: 5000 });
+        await sleep(1500, 2500);
+      }
 
       const confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认")').first();
       await confirmBtn.click({ timeout: 5000 }).catch(() => {});
       await sleep(1000, 2000);
     } catch {
-      // 如果建议封面也失败了，尝试直接点击封面区域的 + 号触发截帧
-      try {
-        const plusBtn = page.locator('text=上传封面').first();
-        await plusBtn.click({ timeout: 3000 });
-        await sleep(1000, 2000);
-      } catch {}
+      // 本地上传失败，回退到封面截取
+      await useFrameCover(page);
     }
+  } else {
+    // 没有提供封面 → 使用"封面截取"，默认选第一帧
+    await useFrameCover(page);
+  }
+
+  // 确保对话框关闭
+  await page.keyboard.press('Escape').catch(() => {});
+  await sleep(300, 500);
+}
+
+async function useFrameCover(page) {
+  try {
+    await sleep(2000, 3000);
+
+    // 步骤1：点击"下一步" → 进入封面编辑
+    const nextBtn = page.locator('text=下一步').first();
+    const nextVisible = await nextBtn.isVisible().catch(() => false);
+    console.error(JSON.stringify({ step: 'cover', next_visible: nextVisible }));
+
+    if (!nextVisible) {
+      console.error('未找到"下一步"按钮，跳过封面设置');
+      return;
+    }
+
+    await nextBtn.click({ force: true, timeout: 5000 });
+    await sleep(3000, 4000);
+
+    // 步骤2：封面编辑页 → 点击底部红色"确定"按钮（触发二次确认弹窗）
+    // 使用 Playwright locator（可穿透 Shadow DOM）
+    let okCount = await page.locator('text="确定"').count();
+    console.error(JSON.stringify({ step: 'editing_ok', ok_count: okCount }));
+
+    // 从最后一个（最上层）开始尝试点击
+    let clicked = false;
+    for (let i = okCount - 1; i >= 0; i--) {
+      const btn = page.locator('text="确定"').nth(i);
+      const vis = await btn.isVisible().catch(() => false);
+      if (vis) {
+        console.error(JSON.stringify({ step: 'editing_ok_click', index: i }));
+        await btn.click({ force: true, timeout: 5000 });
+        clicked = true;
+        break;
+      }
+    }
+    if (!clicked) {
+      // 备选：直接试最后一个
+      await page.locator('text="确定"').last().click({ force: true, timeout: 5000 }).catch(() => {});
+    }
+    await sleep(2000, 3000);
+
+    // 步骤3：二次确认弹窗 "完成后无法继续编辑，是否确定完成？" → 点击"确定"
+    okCount = await page.locator('text="确定"').count();
+    console.error(JSON.stringify({ step: 'confirm_popup', ok_count: okCount }));
+
+    clicked = false;
+    for (let i = okCount - 1; i >= 0; i--) {
+      const btn = page.locator('text="确定"').nth(i);
+      const vis = await btn.isVisible().catch(() => false);
+      if (vis) {
+        console.error(JSON.stringify({ step: 'confirm_popup_click', index: i }));
+        await btn.click({ force: true, timeout: 5000 });
+        clicked = true;
+        break;
+      }
+    }
+    if (!clicked) {
+      await page.locator('text="确定"').last().click({ force: true, timeout: 5000 }).catch(() => {});
+    }
+
+    // 步骤4：等待封面图片上传完成（对话框自动关闭）
+    console.error(JSON.stringify({ step: 'waiting_cover_upload' }));
+    await sleep(3000, 5000);
+    // 轮询检查对话框是否关闭（最长等 30 秒）
+    const uploadStart = Date.now();
+    while (Date.now() - uploadStart < 30000) {
+      const dialogVisible = await page.locator('text=封面编辑').first().isVisible().catch(() => false);
+      if (!dialogVisible) {
+        console.error(JSON.stringify({ step: 'cover_dialog_closed' }));
+        break;
+      }
+      await sleep(2000, 3000);
+    }
+  } catch (e) {
+    console.error(JSON.stringify({ cover_error: e.message }));
   }
 }
 
@@ -238,3 +345,4 @@ async function clickLabel(page, labelText) {
     await sleep(200, 400);
   } catch {}
 }
+

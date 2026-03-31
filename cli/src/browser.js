@@ -143,8 +143,7 @@ export async function dismissOverlays(page) {
       ];
       for (const sel of closeSelectors) {
         document.querySelectorAll(sel).forEach(el => {
-          el.click();
-          count++;
+          try { if (typeof el.click === 'function') el.click(); count++; } catch {}
         });
       }
 
@@ -154,11 +153,13 @@ export async function dismissOverlays(page) {
       for (const btn of allButtons) {
         const text = btn.textContent?.trim();
         if (text && dismissTexts.some(t => text === t || text.startsWith(t))) {
-          const rect = btn.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0 && rect.width < 400) {
-            btn.click();
-            count++;
-          }
+          try {
+            const rect = btn.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 && rect.width < 400) {
+              btn.click();
+              count++;
+            }
+          } catch {}
         }
       }
 
