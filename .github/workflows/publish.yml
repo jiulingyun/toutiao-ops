@@ -1,0 +1,43 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Sync version from tag
+        working-directory: cli
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "Publishing version: $TAG"
+          npm version "$TAG" --no-git-tag-version --allow-same-version
+
+      - name: Install dependencies
+        working-directory: cli
+        run: npm install --ignore-scripts
+
+      - name: Publish to npm
+        working-directory: cli
+        run: npm publish --access public --provenance
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
