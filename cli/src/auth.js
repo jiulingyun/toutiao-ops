@@ -1,24 +1,19 @@
-import { launchBrowser, closeBrowser, sleep, waitForStable } from './browser.js';
+import { launchBrowser, closeBrowser, sleep, waitForStable, getAccountDir, getScreenshotDir, getBrowserDataDir } from './browser.js';
 import { homedir } from 'os';
 import { join } from 'path';
-import { mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 
 const MP_HOME = 'https://mp.toutiao.com/';
 const LOGIN_PATH = '/auth/page/login';
 const DASHBOARD_PATH = '/profile_v4';
-const SCREENSHOT_DIR = join(homedir(), '.toutiao-ops', 'screenshots');
+const ACCOUNTS_BASE = join(homedir(), '.toutiao-ops', 'accounts');
 
 /**
  * 导航到头条号首页并等待所有重定向完成。
- *
- * 头条的重定向链：
- *   mp.toutiao.com → profile_v4/index → (JS 检测 Cookie) → auth/page/login（未登录时）
- * 必须等 JS 跳转完成后才能准确判断登录状态。
  */
 async function navigateAndSettle(page) {
   await page.goto(MP_HOME, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-  // 第一阶段：等待 HTTP 重定向到 profile_v4 或直接到 login
   try {
     await page.waitForURL((url) => {
       const s = url.toString();
@@ -26,31 +21,30 @@ async function navigateAndSettle(page) {
     }, { timeout: 15000 });
   } catch {}
 
-  // 第二阶段：如果落在 profile_v4，等待可能的 JS 跳转到 auth/page/login
-  // 头条的 JS 会检查 Cookie，如果无效就执行客户端跳转
   if (page.url().includes(DASHBOARD_PATH) && !page.url().includes(LOGIN_PATH)) {
     try {
       await page.waitForURL(
         (url) => url.toString().includes(LOGIN_PATH),
         { timeout: 6000 }
       );
-    } catch {
-      // 6 秒内没跳转 → 说明确实已登录，留在控制台
-    }
+    } catch {}
   }
 }
 
 function isOnLoginPage(url) {
-  return url.includes(LOGIN_PATH) ||
-         url.includes('sso.toutiao.com');
+  return url.includes(LOGIN_PATH) || url.includes('sso.toutiao.com');
 }
 
 function isOnDashboard(url) {
   return url.includes(DASHBOARD_PATH) && !url.includes(LOGIN_PATH);
 }
 
+function accountLabel(opts) {
+  return opts.account || 'default';
+}
+
 /**
- * 检测当前是否已登录头条号。
+ * 检测指定账号是否已登录。
  */
 export async function checkLogin(opts = {}) {
   const { context, page } = await launchBrowser(opts);
@@ -59,22 +53,21 @@ export async function checkLogin(opts = {}) {
     const url = page.url();
 
     if (isOnLoginPage(url)) {
-      return { logged_in: false, message: '未登录，请执行 auth login 扫码登录' };
+      return { logged_in: false, account: accountLabel(opts), message: '未登录，请执行 auth login 扫码登录' };
     }
 
     if (isOnDashboard(url)) {
       const userInfo = await extractUserInfo(page);
-      return { logged_in: true, ...userInfo };
+      return { logged_in: true, account: accountLabel(opts), ...userInfo };
     }
 
-    // 兜底：URL 不确定时用 DOM 判断
     const hasDashboard = await page.$('[class*="sidebar"], [class*="sider"], a[href*="graphic/publish"]');
     if (hasDashboard) {
       const userInfo = await extractUserInfo(page);
-      return { logged_in: true, ...userInfo };
+      return { logged_in: true, account: accountLabel(opts), ...userInfo };
     }
 
-    return { logged_in: false, message: '未登录，请执行 auth login 扫码登录' };
+    return { logged_in: false, account: accountLabel(opts), message: '未登录，请执行 auth login 扫码登录' };
   } finally {
     await closeBrowser(context);
   }
@@ -82,21 +75,19 @@ export async function checkLogin(opts = {}) {
 
 /**
  * 扫码登录流程。
- * 如果未登录，截取二维码图片输出路径供远程用户扫码，然后等待登录完成。
  */
 export async function doLogin(opts = {}) {
   const { context, page } = await launchBrowser({ ...opts, headless: false });
+  const screenshotDir = getScreenshotDir(opts.account);
   try {
     await navigateAndSettle(page);
     const url = page.url();
 
-    // 已登录
     if (isOnDashboard(url)) {
       const userInfo = await extractUserInfo(page);
-      return { logged_in: true, message: '已登录，无需重复登录', ...userInfo };
+      return { logged_in: true, account: accountLabel(opts), message: '已登录，无需重复登录', ...userInfo };
     }
 
-    // 未登录 → 确保在登录页
     if (!isOnLoginPage(url)) {
       await page.goto('https://mp.toutiao.com/auth/page/login', {
         waitUntil: 'load',
@@ -104,19 +95,19 @@ export async function doLogin(opts = {}) {
       });
     }
 
-    // 循环等待扫码：二维码有效期约 60 秒，每 50 秒刷新一次
     const QR_REFRESH_MS = 50000;
-    const MAX_ATTEMPTS = 6; // 最多刷新 6 次 ≈ 5 分钟
+    const MAX_ATTEMPTS = 6;
     let loggedIn = false;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       await waitForStable(page);
       await sleep(1000, 2000);
 
-      const qrScreenshot = await captureQrCode(page);
+      const qrScreenshot = await captureQrCode(page, screenshotDir);
       const isRefresh = attempt > 1;
       console.log(JSON.stringify({
         status: 'waiting_for_scan',
+        account: accountLabel(opts),
         message: isRefresh
           ? `二维码已刷新（第 ${attempt} 次），请重新扫码`
           : '请使用今日头条 APP 扫描二维码登录',
@@ -126,12 +117,11 @@ export async function doLogin(opts = {}) {
       }));
 
       if (attempt === 1) {
-        console.error('请扫描二维码登录（二维码每 50 秒自动刷新，最长等待 5 分钟）...');
+        console.error(`[${accountLabel(opts)}] 请扫描二维码登录（二维码每 50 秒自动刷新，最长等待 5 分钟）...`);
       } else {
-        console.error(`二维码已刷新（第 ${attempt}/${MAX_ATTEMPTS} 次），请重新扫码...`);
+        console.error(`[${accountLabel(opts)}] 二维码已刷新（第 ${attempt}/${MAX_ATTEMPTS} 次），请重新扫码...`);
       }
 
-      // 在本轮二维码有效期内等待扫码跳转
       try {
         await page.waitForURL(
           (u) => {
@@ -143,7 +133,6 @@ export async function doLogin(opts = {}) {
         loggedIn = true;
         break;
       } catch {
-        // 本轮超时，刷新二维码
         if (attempt < MAX_ATTEMPTS) {
           await page.reload({ waitUntil: 'load', timeout: 15000 }).catch(() => {});
         }
@@ -154,14 +143,17 @@ export async function doLogin(opts = {}) {
       throw new Error('登录超时（5 分钟内未完成扫码）');
     }
 
-    // 登录成功后等待页面稳定
     await waitForStable(page);
     await sleep(1000, 2000);
 
     const userInfo = await extractUserInfo(page);
 
+    // 保存账号元信息
+    saveAccountMeta(opts.account, userInfo);
+
     return {
       logged_in: true,
+      account: accountLabel(opts),
       message: '登录成功，会话已保存',
       ...userInfo,
     };
@@ -171,15 +163,80 @@ export async function doLogin(opts = {}) {
 }
 
 /**
- * 截取登录页二维码区域，保存为图片并返回路径。
+ * 清除指定账号的浏览器缓存和会话数据。
  */
-async function captureQrCode(page) {
-  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+export async function doLogout(opts = {}) {
+  const accountDir = getAccountDir(opts.account);
+  const cleared = [];
+
+  if (existsSync(accountDir)) {
+    rmSync(accountDir, { recursive: true, force: true });
+    cleared.push(accountLabel(opts));
+  }
+
+  return {
+    success: true,
+    account: accountLabel(opts),
+    message: `已清除账号 [${accountLabel(opts)}] 的登录缓存`,
+    cleared,
+  };
+}
+
+/**
+ * 列出所有已保存的账号及其状态。
+ */
+export async function listAccounts() {
+  if (!existsSync(ACCOUNTS_BASE)) {
+    return { accounts: [], count: 0 };
+  }
+
+  const dirs = readdirSync(ACCOUNTS_BASE, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name);
+
+  const accounts = dirs.map(name => {
+    const metaPath = join(ACCOUNTS_BASE, name, 'meta.json');
+    let meta = {};
+    if (existsSync(metaPath)) {
+      try {
+        meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
+      } catch {}
+    }
+    const hasBrowserData = existsSync(join(ACCOUNTS_BASE, name, 'browser-data'));
+    return {
+      account: name,
+      has_session: hasBrowserData,
+      ...meta,
+    };
+  });
+
+  return { accounts, count: accounts.length };
+}
+
+// ── 内部工具函数 ──
+
+function saveAccountMeta(account, userInfo) {
+  try {
+    const dir = getAccountDir(account);
+    mkdirSync(dir, { recursive: true });
+    const metaPath = join(dir, 'meta.json');
+    const meta = {
+      username: userInfo.username || '',
+      avatar: userInfo.avatar || '',
+      userId: userInfo.userId || '',
+      profileUrl: userInfo.profileUrl || '',
+      lastLogin: new Date().toISOString(),
+    };
+    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  } catch {}
+}
+
+async function captureQrCode(page, screenshotDir) {
+  mkdirSync(screenshotDir, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filePath = join(SCREENSHOT_DIR, `qrcode-${timestamp}.png`);
+  const filePath = join(screenshotDir, `qrcode-${timestamp}.png`);
 
   try {
-    // 尝试定位二维码容器元素
     const qrEl = await page.$(
       '[class*="qrcode"], [class*="qr-code"], [class*="scan"], ' +
       '[class*="QRCode"], [class*="qr_code"], [class*="web-login"]'
@@ -188,7 +245,6 @@ async function captureQrCode(page) {
     if (qrEl) {
       await qrEl.screenshot({ path: filePath });
     } else {
-      // 找不到二维码元素，截取整个登录区域
       const loginPanel = await page.$(
         '[class*="login-panel"], [class*="login-container"], ' +
         '[class*="login-wrapper"], [class*="content"], main, #app'
@@ -200,35 +256,24 @@ async function captureQrCode(page) {
       }
     }
   } catch {
-    // 所有定位方式都失败，截全屏
     await page.screenshot({ path: filePath });
   }
 
   return filePath;
 }
 
-/**
- * 从控制台页面提取当前登录用户信息。
- * 头条控制台的用户信息在 .information 区块：
- *   .auth-avator-name  → 昵称
- *   .auth-avator-img   → 头像
- *   .information a[href*="user/"] → 主页链接（含 userId）
- */
 async function extractUserInfo(page) {
   await sleep(500, 1000);
   try {
     await page.waitForSelector('.information, .auth-avator-name', { timeout: 8000 }).catch(() => {});
 
     const info = await page.evaluate(() => {
-      // 昵称
       const nameEl = document.querySelector('.auth-avator-name');
       const username = nameEl?.textContent?.trim() || '';
 
-      // 头像
       const avatarEl = document.querySelector('.auth-avator-img');
       const avatar = avatarEl?.src || '';
 
-      // 用户 ID：从主页链接 //www.toutiao.com/c/user/3580433091797615/ 提取
       let userId = '';
       const profileLink = document.querySelector('.information a[href*="user/"]');
       if (profileLink) {
@@ -237,7 +282,6 @@ async function extractUserInfo(page) {
         if (match) userId = match[1];
       }
 
-      // 主页 URL
       const profileUrl = profileLink?.href || '';
 
       return { username, avatar, userId, profileUrl, url: window.location.href };
@@ -246,29 +290,4 @@ async function extractUserInfo(page) {
   } catch {
     return { username: '', avatar: '', userId: '', profileUrl: '', url: page.url() };
   }
-}
-
-/**
- * 清除浏览器缓存和会话数据（退出登录）。
- * 删除持久化上下文目录和截图目录，下次操作需重新扫码登录。
- */
-export async function doLogout() {
-  const browserDataDir = join(homedir(), '.toutiao-ops', 'browser-data');
-  const cleared = [];
-
-  if (existsSync(browserDataDir)) {
-    rmSync(browserDataDir, { recursive: true, force: true });
-    cleared.push('browser-data');
-  }
-
-  if (existsSync(SCREENSHOT_DIR)) {
-    rmSync(SCREENSHOT_DIR, { recursive: true, force: true });
-    cleared.push('screenshots');
-  }
-
-  return {
-    success: true,
-    message: '已清除登录缓存，下次操作需重新扫码登录',
-    cleared,
-  };
 }

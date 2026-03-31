@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { checkLogin, doLogin, doLogout } from './src/auth.js';
+import { checkLogin, doLogin, doLogout, listAccounts } from './src/auth.js';
 import { publishArticle } from './src/publish-article.js';
 import { publishVideo } from './src/publish-video.js';
 import { publishWeitoutiao } from './src/publish-weitoutiao.js';
@@ -15,7 +15,8 @@ const program = new Command();
 program
   .name('toutiao')
   .description('今日头条创作者平台运营自动化工具')
-  .version('1.0.0');
+  .version('1.0.0')
+  .option('--account <name>', '指定操作的账号（默认 default）', 'default');
 
 // ── auth ──
 const auth = program.command('auth');
@@ -40,6 +41,13 @@ auth
   .description('清除登录缓存（退出登录，用于切换账号）')
   .action(async (opts) => {
     await run(doLogout, opts);
+  });
+
+auth
+  .command('list')
+  .description('列出所有已保存的账号')
+  .action(async () => {
+    await run(listAccounts, {});
   });
 
 // ── publish ──
@@ -161,8 +169,11 @@ program
   });
 
 // ── runner ──
-async function run(fn, opts) {
+async function run(fn, subOpts) {
   try {
+    // 将全局 --account 合并到子命令 opts 中
+    const globalOpts = program.opts();
+    const opts = { ...subOpts, account: globalOpts.account };
     const result = await fn(opts);
     console.log(JSON.stringify(result, null, 2));
     process.exit(0);

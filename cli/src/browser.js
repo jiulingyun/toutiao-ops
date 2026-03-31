@@ -6,7 +6,8 @@ import { mkdirSync } from 'fs';
 
 chromium.use(StealthPlugin());
 
-const USER_DATA_DIR = join(homedir(), '.toutiao-ops', 'browser-data');
+const BASE_DIR = join(homedir(), '.toutiao-ops');
+const DEFAULT_ACCOUNT = 'default';
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 
@@ -18,19 +19,42 @@ const LAUNCH_ARGS = [
 ];
 
 /**
+ * 获取指定账号的数据目录路径。
+ */
+export function getAccountDir(account) {
+  return join(BASE_DIR, 'accounts', account || DEFAULT_ACCOUNT);
+}
+
+/**
+ * 获取指定账号的浏览器数据目录。
+ */
+export function getBrowserDataDir(account) {
+  return join(getAccountDir(account), 'browser-data');
+}
+
+/**
+ * 获取指定账号的截图目录。
+ */
+export function getScreenshotDir(account) {
+  return join(getAccountDir(account), 'screenshots');
+}
+
+/**
  * 启动持久化浏览器上下文。
- * 会话数据保存在 ~/.toutiao-ops/browser-data/，首次登录后后续启动自动复用 Cookie。
+ * 会话数据按账号隔离，保存在 ~/.toutiao-ops/accounts/<name>/browser-data/。
  *
  * @param {object} opts
+ * @param {string} [opts.account="default"]
  * @param {boolean} [opts.headless=false]
  * @returns {{ context: BrowserContext, page: Page }}
  */
 export async function launchBrowser(opts = {}) {
-  mkdirSync(USER_DATA_DIR, { recursive: true });
+  const userDataDir = getBrowserDataDir(opts.account);
+  mkdirSync(userDataDir, { recursive: true });
 
   const headless = Boolean(opts.headless);
 
-  const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
+  const context = await chromium.launchPersistentContext(userDataDir, {
     headless,
     viewport: DEFAULT_VIEWPORT,
     locale: 'zh-CN',
@@ -54,8 +78,6 @@ export async function closeBrowser(context) {
 
 /**
  * 随机延迟，模拟人类操作节奏
- * @param {number} min 毫秒下限
- * @param {number} max 毫秒上限
  */
 export function sleep(min = 200, max = 800) {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
