@@ -20,9 +20,11 @@ metadata:
       content list: node {baseDir}/cli/index.js content list
       comment list: node {baseDir}/cli/index.js comment list
       comment reply: node {baseDir}/cli/index.js comment reply
+      comment like: node {baseDir}/cli/index.js comment like
       analytics works: node {baseDir}/cli/index.js analytics works
       analytics fans: node {baseDir}/cli/index.js analytics fans
       analytics income: node {baseDir}/cli/index.js analytics income
+      analytics content-detail: node {baseDir}/cli/index.js analytics content-detail
       inspiration: node {baseDir}/cli/index.js inspiration
 ---
 
@@ -70,10 +72,10 @@ node {baseDir}/cli/index.js auth list
 - 微头条发布 -> `references/publish-weitoutiao.md`
 - 作品管理 -> `references/content-manage.md`
 - 评论管理 -> `references/comment-manage.md`
-- 作品数据分析 -> `references/analytics-works.md`
-- 粉丝数据分析 -> `references/analytics-fans.md`
-- 收益数据分析 -> `references/analytics-income.md`
-- 创作灵感 -> `references/inspiration.md`
+- 作品数据分析（含单个作品详细数据） -> `references/analytics-works.md`
+- 粉丝数据分析（含分布数据 + 粉丝偏好） -> `references/analytics-fans.md`
+- 收益数据分析（支持图文/视频收益筛选） -> `references/analytics-income.md`
+- 创作灵感（创作活动 + 热点推荐） -> `references/inspiration.md`
 
 ## 命令速查
 
@@ -83,16 +85,18 @@ node {baseDir}/cli/index.js auth list
 | `auth login` | 扫码登录（输出二维码截图路径，需展示给用户） |
 | `auth logout` | 清除指定账号的登录缓存 |
 | `auth list` | 列出所有已保存的账号 |
-| `publish article --title "..." --content "..."` | 发布图文文章 |
-| `publish video --title "..." --file "path"` | 发布视频 |
-| `publish weitoutiao --content "..."` | 发布微头条 |
-| `content list` | 查看作品列表 |
-| `comment list` | 查看评论列表 |
-| `comment reply --comment-id "..." --content "..."` | 回复评论 |
-| `analytics works` | 作品数据概览 |
-| `analytics fans` | 粉丝数据概览 |
-| `analytics income` | 收益数据概览 |
-| `inspiration` | 创作灵感推荐 |
+| `publish article --title "..." --content "..."` | 发布文章（支持 --cover-mode / --first-publish / --collection / --declaration 等） |
+| `publish video --title "..." --file "path"` | 发布视频（支持 --topic / --cover / --gen-article / --visibility 等） |
+| `publish weitoutiao --content "..."` | 发布微头条（支持 --images / --topic / --first-publish / --declaration 等） |
+| `content list` | 查看作品列表（支持 --type / --status） |
+| `comment list` | 查看评论列表（支持 --with-replies 获取子评论） |
+| `comment reply --comment-id "..." --content "..."` | 回复评论（支持 ID / 内容片段 / 序号定位） |
+| `comment like --comment-id "..."` | 点赞评论（支持 ID / 内容片段 / 序号定位） |
+| `analytics works` | 作品数据概览（支持 --type article / video / weitoutiao） |
+| `analytics fans` | 粉丝数据（含性别/年龄/地域/机型价格分布 + 粉丝偏好） |
+| `analytics income` | 收益数据（支持 --type article / video） |
+| `analytics content-detail` | 单个作品详细数据（支持 --content-id / --content-type） |
+| `inspiration` | 创作灵感（支持 --type activity / hotspot） |
 
 ## 通用选项
 

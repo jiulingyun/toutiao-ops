@@ -12,12 +12,13 @@ node {baseDir}/cli/index.js content list [--type all] [--status published] [--pa
 
 ## 参数
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--type` | all | 筛选类型：article / video / weitoutiao / all |
-| `--status` | published | 状态：published / reviewing / rejected |
-| `--page` | 1 | 页码 |
-| `--limit` | 20 | 每页数量 |
+| 参数 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--type` | 否 | `all` | 筛选类型：`article` / `video` / `weitoutiao` / `all` |
+| `--status` | 否 | `published` | 状态：`published` / `reviewing` / `rejected` |
+| `--page` | 否 | `1` | 页码 |
+| `--limit` | 否 | `20` | 每页数量 |
+| `--headless` | 否 | false | 无头模式运行 |
 
 ## 数据获取策略
 
