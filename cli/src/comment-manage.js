@@ -14,18 +14,21 @@ export async function listComments(opts) {
 
     const apiResponses = [];
     page.on('response', async (response) => {
-      const url = response.url();
-      if (url.includes('comment') && (url.includes('/pgc/') || url.includes('/api/'))) {
-        try {
-          const json = await response.json();
-          apiResponses.push({ url, data: json });
-        } catch {}
-      }
+      try {
+        const url = response.url();
+        const ct = response.headers()['content-type'] || '';
+        if (!ct.includes('json')) return;
+        if (url.includes('/static/') || url.includes('.css') || url.includes('.js')) return;
+        const json = await response.json();
+        if (url.includes('comment') || json?.data?.comments || json?.data?.comment_list) {
+          apiResponses.push({ url: url.split('?')[0], data: json });
+        }
+      } catch {}
     });
 
     await page.goto(COMMENT_PAGE, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForStable(page);
-    await sleep(2000, 3000);
+    await sleep(3000, 4000);
     await dismissOverlays(page);
 
     if (apiResponses.length > 0) {
@@ -37,15 +40,51 @@ export async function listComments(opts) {
       };
     }
 
+    // DOM 提取：按评论卡片结构解析，通过页面全文智能分割
     const items = await page.evaluate(() => {
-      const rows = document.querySelectorAll('[class*="comment-item"], [class*="comment-card"], [class*="list"] > div[class*="item"]');
-      return Array.from(rows).map(row => {
-        const author = row.querySelector('[class*="author"], [class*="name"], [class*="user"]')?.textContent?.trim() || '';
-        const content = row.querySelector('[class*="content"], [class*="text"], [class*="body"]')?.textContent?.trim() || '';
-        const time = row.querySelector('[class*="time"], [class*="date"], time')?.textContent?.trim() || '';
-        const articleTitle = row.querySelector('[class*="article"], [class*="title"] a')?.textContent?.trim() || '';
-        return { author, content, time, articleTitle };
-      }).filter(i => i.content);
+      const results = [];
+      const seen = new Set();
+      // 头条评论管理页的每条评论通常包含：用户名、评论内容、时间、所属文章
+      // 尝试多种选择器
+      const commentBlocks = document.querySelectorAll(
+        '[class*="comment-item"], [class*="comment-card"], [class*="commentItem"], [class*="comment_item"]'
+      );
+
+      if (commentBlocks.length > 0) {
+        for (const block of commentBlocks) {
+          const text = block.innerText?.trim() || '';
+          if (!text || text.length < 5) continue;
+          const key = text.substring(0, 60);
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          const author = block.querySelector('[class*="name"], [class*="author"], [class*="user-name"]')?.textContent?.trim() || '';
+          const time = block.querySelector('time, [class*="time"], [class*="date"]')?.textContent?.trim() || '';
+          const contentEl = block.querySelector('[class*="content"], [class*="text"], [class*="body"]');
+          const content = contentEl?.textContent?.trim() || '';
+          const articleEl = block.querySelector('[class*="article"], [class*="source"] a, [class*="title"] a');
+          const articleTitle = articleEl?.textContent?.trim() || '';
+          if (content && content.length > 1) {
+            results.push({ author, content, time, articleTitle });
+          }
+        }
+      }
+
+      // 回退：如果未找到评论块，从页面文本智能提取
+      if (results.length === 0) {
+        const textContent = document.body.innerText;
+        const commentPattern = /(.{2,30})\n(.{5,200})\n(\d{2}-\d{2}\s\d{2}:\d{2})/g;
+        let match;
+        while ((match = commentPattern.exec(textContent)) !== null) {
+          const [, possibleAuthor, content, time] = match;
+          const key = content.substring(0, 40);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          results.push({ author: possibleAuthor, content, time, articleTitle: '' });
+        }
+      }
+
+      return results;
     });
 
     return {

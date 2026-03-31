@@ -41,7 +41,7 @@ export async function listInspiration(opts) {
     }
 
     // 回退：DOM 提取
-    const items = await page.evaluate(() => {
+    const rawItems = await page.evaluate(() => {
       const tasks = document.querySelectorAll('[class*="task-item"], [class*="activity-item"], [class*="topic-item"], [class*="card"], [class*="inspiration"] [class*="item"]');
       return Array.from(tasks).map(item => {
         const title = item.querySelector('[class*="title"], h3, h4, [class*="name"]')?.textContent?.trim() || '';
@@ -51,6 +51,15 @@ export async function listInspiration(opts) {
         const deadline = item.querySelector('[class*="time"], [class*="deadline"], [class*="date"]')?.textContent?.trim() || '';
         return { title, desc, hot, reward, deadline };
       }).filter(i => i.title);
+    });
+
+    // 去重（同标题+描述视为同一项）
+    const seen = new Set();
+    const items = rawItems.filter(item => {
+      const key = `${item.title}|${item.desc}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
 
     return {

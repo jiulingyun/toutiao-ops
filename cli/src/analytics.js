@@ -35,27 +35,23 @@ async function collectAnalytics(targetUrl, category, opts) {
     const apiResponses = [];
     page.on('response', async (response) => {
       const url = response.url();
-      const isAnalyticsApi =
-        url.includes('/pgc/ma/') ||
-        url.includes('/api/') && (
-          url.includes('analysis') ||
-          url.includes('statistic') ||
-          url.includes('overview') ||
-          url.includes('income') ||
-          url.includes('fans') ||
-          url.includes('data')
-        );
-      if (isAnalyticsApi) {
-        try {
-          const json = await response.json();
-          apiResponses.push({ url, data: json });
-        } catch {}
-      }
+      try {
+        const ct = response.headers()['content-type'] || '';
+        if (!ct.includes('json')) return;
+        // 只拦截与分析数据相关的 API
+        const isRelevant = url.includes('analysis') || url.includes('statistic')
+          || url.includes('overview') || url.includes('income')
+          || url.includes('fans_data') || url.includes('data_overview')
+          || url.includes('/pgc/ma/');
+        if (!isRelevant) return;
+        const json = await response.json();
+        apiResponses.push({ url: url.split('?')[0], data: json });
+      } catch {}
     });
 
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForStable(page);
-    await sleep(2000, 4000);
+    await sleep(3000, 5000);
     await dismissOverlays(page);
 
     if (apiResponses.length > 0) {
@@ -68,32 +64,70 @@ async function collectAnalytics(targetUrl, category, opts) {
       };
     }
 
-    // 回退：从 DOM 抓取数据卡片
-    const cards = await page.evaluate(() => {
+    // 回退：从页面可见文本中提取数据对（标签-数值）
+    const pageData = await page.evaluate(() => {
       const metrics = {};
-      const statCards = document.querySelectorAll('[class*="stat"], [class*="metric"], [class*="card"], [class*="overview"] [class*="item"]');
-      statCards.forEach(card => {
-        const label = card.querySelector('[class*="label"], [class*="name"], [class*="title"]')?.textContent?.trim() || '';
-        const value = card.querySelector('[class*="value"], [class*="number"], [class*="count"]')?.textContent?.trim() || '';
-        if (label && value) {
-          metrics[label] = value;
-        }
-      });
-      return metrics;
-    });
 
-    // 尝试获取趋势图表数据
-    const chartData = await page.evaluate(() => {
-      const charts = document.querySelectorAll('[class*="chart"], [class*="trend"], canvas');
-      return { chartCount: charts.length, hasChart: charts.length > 0 };
+      // 方法1：找"标签 + 数值"的相邻元素对
+      const allEls = document.querySelectorAll('span, div, p, td, h3, h4, label');
+      const visited = new Set();
+      for (const el of allEls) {
+        if (visited.has(el)) continue;
+        const text = el.innerText?.trim();
+        if (!text || text.length > 50) continue;
+
+        // 找紧邻的兄弟或父子中的数值
+        const sibling = el.nextElementSibling;
+        if (sibling) {
+          const sibText = sibling.innerText?.trim();
+          if (sibText && /^[\d,.\-+%万亿千百元￥]+$/.test(sibText.replace(/\s/g, ''))) {
+            if (!visited.has(sibling) && text.length < 20) {
+              metrics[text] = sibText;
+              visited.add(el);
+              visited.add(sibling);
+            }
+          }
+        }
+      }
+
+      // 方法2：纯文本扫描，提取概览区域的数据
+      const bodyText = document.body.innerText;
+      const patterns = [
+        /展现量[：:\s]*([0-9,]+)/,
+        /阅读量[：:\s]*([0-9,]+)/,
+        /播放量[：:\s]*([0-9,]+)/,
+        /评论量?[：:\s]*([0-9,]+)/,
+        /点赞量?[：:\s]*([0-9,]+)/,
+        /收藏量?[：:\s]*([0-9,]+)/,
+        /转发量?[：:\s]*([0-9,]+)/,
+        /关注量?[：:\s]*([0-9,]+)/,
+        /粉丝[总数量]*[：:\s]*([0-9,]+)/,
+        /涨粉[数]*[：:\s]*([0-9,]+)/,
+        /掉粉[数]*[：:\s]*([0-9,]+)/,
+        /总收入[：:\s]*([\d,.]+)/,
+        /昨日收入[：:\s]*([\d,.]+)/,
+        /累计收入[：:\s]*([\d,.]+)/,
+        /预估收入[：:\s]*([\d,.]+)/,
+        /基础收益[：:\s]*([\d,.]+)/,
+        /创作收益[：:\s]*([\d,.]+)/,
+        /发文量?[：:\s]*([0-9,]+)/,
+      ];
+      for (const re of patterns) {
+        const m = bodyText.match(re);
+        if (m) {
+          const label = re.source.split('[')[0].replace(/\\/g, '');
+          metrics[label] = m[1];
+        }
+      }
+
+      return metrics;
     });
 
     return {
       success: true,
       category,
-      source: 'dom_scrape',
-      metrics: cards,
-      chart: chartData,
+      source: apiResponses.length > 0 ? 'api_intercept' : 'dom_scrape',
+      metrics: pageData,
     };
   } finally {
     await closeBrowser(context);
