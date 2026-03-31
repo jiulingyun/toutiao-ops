@@ -7,7 +7,7 @@ import { publishVideo } from './src/publish-video.js';
 import { publishWeitoutiao } from './src/publish-weitoutiao.js';
 import { listContent } from './src/content-manage.js';
 import { listComments, replyComment } from './src/comment-manage.js';
-import { getWorksAnalytics, getFansAnalytics, getIncomeAnalytics } from './src/analytics.js';
+import { getWorksAnalytics, getFansAnalytics, getIncomeAnalytics, getContentDetail } from './src/analytics.js';
 import { listInspiration } from './src/inspiration.js';
 
 const program = new Command();
@@ -148,7 +148,7 @@ analytics
   .command('works')
   .description('查看作品数据')
   .option('--period <period>', '时间范围: 7d / 30d', '7d')
-  .option('--type <type>', '类型: article / video / all', 'all')
+  .option('--type <type>', '类型: all / article / video / weitoutiao', 'all')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
     await run(getWorksAnalytics, opts);
@@ -166,16 +166,27 @@ analytics
   .command('income')
   .description('查看收益数据')
   .option('--period <period>', '时间范围: 7d / 30d', '7d')
+  .option('--type <type>', '类型: all / article / video', 'all')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
     await run(getIncomeAnalytics, opts);
+  });
+
+analytics
+  .command('content-detail')
+  .description('查看单个作品的详细数据')
+  .option('--content-id <id>', '作品 ID（item_id / gidStr）')
+  .option('--content-type <type>', '内容类型编号: 2=图文/微头条, 3=视频', '2')
+  .option('--headless', '无头模式运行')
+  .action(async (opts) => {
+    await run(getContentDetail, opts);
   });
 
 // ── inspiration ──
 program
   .command('inspiration')
   .description('查看创作灵感')
-  .option('--category <cat>', '灵感分类')
+  .option('--type <type>', '类型: activity（创作活动）/ hotspot（热点推荐）', 'activity')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
     await run(listInspiration, opts);
