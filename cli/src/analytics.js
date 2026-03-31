@@ -27,10 +27,35 @@ export async function getWorksAnalytics(opts) {
 }
 
 /**
- * 获取粉丝数据。
+ * 获取粉丝数据（含性别、年龄、地域、机型价格分布）。
  */
 export async function getFansAnalytics(opts) {
-  return collectAnalytics(FANS_URL, 'fans', opts);
+  const { context, page } = await launchBrowser(opts);
+  try {
+    await ensureLoggedIn(page);
+
+    await page.goto(FANS_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await waitForStable(page);
+    await sleep(3000, 5000);
+    await dismissOverlays(page);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await sleep(2000, 3000);
+
+    const fansData = await extractFansDistributions(page);
+    const basicMetrics = await extractPageMetrics(page);
+    const noiseKeys = ['消息', '头条号', '主页', '设置'];
+    for (const k of noiseKeys) delete basicMetrics[k];
+
+    return {
+      success: true,
+      category: 'fans',
+      source: 'dom_scrape',
+      metrics: basicMetrics,
+      distributions: fansData,
+    };
+  } finally {
+    await closeBrowser(context);
+  }
 }
 
 /**
@@ -141,6 +166,9 @@ async function collectAnalytics(targetUrl, category, opts) {
 
     // 回退：DOM 提取
     const pageData = await extractPageMetrics(page);
+    // 过滤非数据字段（页面导航元素）
+    const noiseKeys = ['消息', '头条号', '主页', '设置'];
+    for (const k of noiseKeys) delete pageData[k];
     return {
       success: true,
       category,
@@ -150,6 +178,79 @@ async function collectAnalytics(targetUrl, category, opts) {
   } finally {
     await closeBrowser(context);
   }
+}
+
+async function extractFansDistributions(page) {
+  return page.evaluate(() => {
+    const result = {};
+    const fiberKey = (el) => Object.keys(el).find(k => k.startsWith('__reactInternalInstance') || k.startsWith('__reactFiber'));
+
+    // --- 性别分布：从 .mp-chart-pie 的 React data prop 提取 ---
+    const genderBox = (() => {
+      for (const t of document.querySelectorAll('.chart-box-title')) {
+        if (t.innerText?.trim() === '性别分布') return t.closest('.chart-box');
+      }
+      return null;
+    })();
+    if (genderBox) {
+      const pieEl = genderBox.querySelector('.mp-chart-pie');
+      if (pieEl) {
+        const fk = fiberKey(pieEl);
+        if (fk) {
+          let fiber = pieEl[fk];
+          for (let i = 0; i < 20 && fiber; i++) {
+            const props = fiber.memoizedProps || fiber.pendingProps;
+            if (props?.data && Array.isArray(props.data)) {
+              const total = props.data.reduce((s, d) => s + (d.value || 0), 0);
+              result.gender = props.data.map(d => ({
+                label: d.name,
+                value: d.value,
+                percent: total > 0 ? ((d.value / total) * 100).toFixed(2) + '%' : '0%',
+              }));
+              break;
+            }
+            fiber = fiber.return;
+          }
+        }
+      }
+    }
+
+    // --- 年龄 & 机型价格：从 echarts-for-react 的 option prop 提取 ---
+    const chartBoxes = document.querySelectorAll('.chart-box');
+    for (const box of chartBoxes) {
+      const titleEl = box.querySelector('.chart-box-title');
+      const title = titleEl?.innerText?.trim();
+      if (title !== '年龄分布' && title !== '机型价格分布') continue;
+
+      const echartsEl = box.querySelector('.echarts-for-react');
+      if (!echartsEl) continue;
+      const fk = fiberKey(echartsEl);
+      if (!fk) continue;
+
+      let fiber = echartsEl[fk];
+      for (let i = 0; i < 20 && fiber; i++) {
+        const props = fiber.memoizedProps || fiber.pendingProps;
+        if (props?.option?.series && props?.option?.xAxis) {
+          const opt = props.option;
+          const xData = (Array.isArray(opt.xAxis) ? opt.xAxis[0] : opt.xAxis).data || [];
+          const series = opt.series[0];
+          const labels = xData.map(x => typeof x === 'object' ? x.value : x);
+          const values = series.data || [];
+          const items = labels.map((label, idx) => ({
+            label,
+            percent: ((values[idx] || 0) * 100).toFixed(2) + '%',
+          }));
+
+          if (title === '年龄分布') result.age = items;
+          else result.devicePrice = items;
+          break;
+        }
+        fiber = fiber.return;
+      }
+    }
+
+    return result;
+  });
 }
 
 async function extractPageMetrics(page) {
