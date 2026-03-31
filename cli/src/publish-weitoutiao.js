@@ -33,11 +33,18 @@ export async function publishWeitoutiao(opts) {
     await page.click(editorSelector, { force: true });
     await sleep(200, 400);
 
-    const paragraphs = opts.content.split('\n').filter(Boolean);
-    for (const para of paragraphs) {
-      await page.keyboard.type(para, { delay: 40 + Math.random() * 80 });
-      await page.keyboard.press('Enter');
-      await sleep(100, 300);
+    // 将字面量 \n 转换为真正的换行符
+    const text = opts.content.replace(/\\n/g, '\n');
+    const paragraphs = text.split('\n');
+    for (let i = 0; i < paragraphs.length; i++) {
+      const para = paragraphs[i];
+      if (para) {
+        await page.keyboard.type(para, { delay: 40 + Math.random() * 80 });
+      }
+      if (i < paragraphs.length - 1) {
+        await page.keyboard.press('Enter');
+        await sleep(100, 300);
+      }
     }
     await sleep(500, 1000);
 
