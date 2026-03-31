@@ -1,27 +1,27 @@
-import { launchBrowser, closeBrowser, sleep, browserFetch, waitForStable, dismissOverlays } from './browser.js';
+import { launchBrowser, closeBrowser, sleep, waitForStable, dismissOverlays } from './browser.js';
 import { ensureLoggedIn } from './auth-guard.js';
 
 const COMMENT_PAGE = 'https://mp.toutiao.com/profile_v4/manage/comment/all';
 
 /**
- * 获取评论列表。
- * 先尝试拦截 API，回退到 DOM 提取。
+ * 获取评论列表（含子评论/回复）。
+ * 优先 API 拦截；API 数据中已包含 reply_count。
+ * 若指定 --with-replies，会逐条点击评论从右侧面板提取子评论。
  */
 export async function listComments(opts) {
   const { context, page } = await launchBrowser(opts);
   try {
     await ensureLoggedIn(page);
 
-    const apiResponses = [];
+    const apiData = [];
     page.on('response', async (response) => {
       try {
         const url = response.url();
         const ct = response.headers()['content-type'] || '';
         if (!ct.includes('json')) return;
-        if (url.includes('/static/') || url.includes('.css') || url.includes('.js')) return;
         const json = await response.json();
         if (url.includes('comment') || json?.data?.comments || json?.data?.comment_list) {
-          apiResponses.push({ url: url.split('?')[0], data: json });
+          apiData.push(json);
         }
       } catch {}
     });
@@ -31,68 +31,26 @@ export async function listComments(opts) {
     await sleep(3000, 4000);
     await dismissOverlays(page);
 
-    if (apiResponses.length > 0) {
-      return {
-        success: true,
-        source: 'api_intercept',
-        items: apiResponses.map(r => r.data),
-        count: apiResponses.length,
-      };
-    }
+    // 优先使用 API 数据
+    const apiComments = apiData.flatMap(d => d?.data || []).filter(c => c.id_str);
+    if (apiComments.length > 0) {
+      const comments = apiComments.map(formatApiComment);
 
-    // DOM 提取：按评论卡片结构解析，通过页面全文智能分割
-    const items = await page.evaluate(() => {
-      const results = [];
-      const seen = new Set();
-      // 头条评论管理页的每条评论通常包含：用户名、评论内容、时间、所属文章
-      // 尝试多种选择器
-      const commentBlocks = document.querySelectorAll(
-        '[class*="comment-item"], [class*="comment-card"], [class*="commentItem"], [class*="comment_item"]'
-      );
-
-      if (commentBlocks.length > 0) {
-        for (const block of commentBlocks) {
-          const text = block.innerText?.trim() || '';
-          if (!text || text.length < 5) continue;
-          const key = text.substring(0, 60);
-          if (seen.has(key)) continue;
-          seen.add(key);
-
-          const author = block.querySelector('[class*="name"], [class*="author"], [class*="user-name"]')?.textContent?.trim() || '';
-          const time = block.querySelector('time, [class*="time"], [class*="date"]')?.textContent?.trim() || '';
-          const contentEl = block.querySelector('[class*="content"], [class*="text"], [class*="body"]');
-          const content = contentEl?.textContent?.trim() || '';
-          const articleEl = block.querySelector('[class*="article"], [class*="source"] a, [class*="title"] a');
-          const articleTitle = articleEl?.textContent?.trim() || '';
-          if (content && content.length > 1) {
-            results.push({ author, content, time, articleTitle });
+      // 如果需要获取子评论
+      if (opts.withReplies) {
+        for (let i = 0; i < comments.length; i++) {
+          if (comments[i].replyCount > 0) {
+            comments[i].replies = await extractRepliesForComment(page, i);
           }
         }
       }
 
-      // 回退：如果未找到评论块，从页面文本智能提取
-      if (results.length === 0) {
-        const textContent = document.body.innerText;
-        const commentPattern = /(.{2,30})\n(.{5,200})\n(\d{2}-\d{2}\s\d{2}:\d{2})/g;
-        let match;
-        while ((match = commentPattern.exec(textContent)) !== null) {
-          const [, possibleAuthor, content, time] = match;
-          const key = content.substring(0, 40);
-          if (seen.has(key)) continue;
-          seen.add(key);
-          results.push({ author: possibleAuthor, content, time, articleTitle: '' });
-        }
-      }
+      return { success: true, source: 'api_intercept', comments, count: comments.length };
+    }
 
-      return results;
-    });
-
-    return {
-      success: true,
-      source: 'dom_scrape',
-      items,
-      count: items.length,
-    };
+    // DOM 回退
+    const comments = await extractCommentsFromDOM(page);
+    return { success: true, source: 'dom_scrape', comments, count: comments.length };
   } finally {
     await closeBrowser(context);
   }
@@ -100,63 +58,211 @@ export async function listComments(opts) {
 
 /**
  * 回复评论。
- * 使用浏览器自动化在评论管理页面操作，避免直接 POST 被风控。
+ * 流程：点击左侧评论 → 右侧面板展开 → 输入回复 → 点击发布。
  */
 export async function replyComment(opts) {
   const { context, page } = await launchBrowser(opts);
   try {
     await ensureLoggedIn(page);
+
+    const apiData = [];
+    page.on('response', async (response) => {
+      try {
+        const url = response.url();
+        const ct = response.headers()['content-type'] || '';
+        if (!ct.includes('json')) return;
+        const json = await response.json();
+        if (url.includes('comment') && json?.data) {
+          apiData.push(json);
+        }
+      } catch {}
+    });
+
     await page.goto(COMMENT_PAGE, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForStable(page);
-    await sleep(1500, 2500);
+    await sleep(2000, 3000);
+    await dismissOverlays(page);
 
-    // 查找目标评论并展开回复框
-    const commented = await page.evaluate((commentId) => {
-      const items = document.querySelectorAll('[class*="comment-item"], [class*="comment-card"]');
-      for (const item of items) {
-        const idAttr = item.getAttribute('data-id') || item.getAttribute('data-comment-id') || '';
-        if (idAttr === commentId || item.textContent.includes(commentId)) {
-          const replyBtn = item.querySelector('button:has-text("回复"), [class*="reply"]');
-          if (replyBtn) {
-            replyBtn.click();
-            return true;
-          }
-        }
-      }
-      return false;
-    }, opts.commentId);
+    // 1. 在左侧列表找到目标评论并点击选中（打开右侧面板）
+    const found = await selectComment(page, opts.commentId);
+    if (!found) {
+      return { success: false, error: `未找到评论 ${opts.commentId}，请确认评论 ID 正确` };
+    }
+    await sleep(1500, 2000);
 
-    if (!commented) {
-      // 尝试用通用方式找回复按钮
-      const replyBtns = await page.$$('[class*="reply-btn"], button:has-text("回复")');
-      if (replyBtns.length > 0) {
-        await replyBtns[0].click();
-      }
+    // 2. 在右侧面板中找到可见的回复输入框
+    //    左侧每条评论内嵌的 textarea 是隐藏的，右侧面板的 textarea 才可见
+    const allTextareas = await page.$$('textarea.byte-textarea');
+    let visibleTextarea = null;
+    for (const ta of allTextareas) {
+      const visible = await ta.isVisible();
+      if (visible) { visibleTextarea = ta; break; }
+    }
+    if (!visibleTextarea) {
+      return { success: false, error: '未找到可见的回复输入框' };
     }
 
-    await sleep(500, 1000);
+    await visibleTextarea.click();
+    await sleep(300, 500);
+    const replyText = opts.content.replace(/\\n/g, '\n');
+    await page.keyboard.type(replyText, { delay: 50 + Math.random() * 80 });
+    await sleep(500, 800);
 
-    const replyInput = await page.$('[class*="reply"] textarea, [class*="reply"] [contenteditable], [class*="reply-input"] textarea');
-    if (replyInput) {
-      await replyInput.click();
-      await page.keyboard.type(opts.content, { delay: 50 + Math.random() * 80 });
-      await sleep(300, 600);
-
-      const submitBtn = await page.$('[class*="reply"] button:has-text("发布"), [class*="reply"] button:has-text("回复"), [class*="reply"] button[type="submit"]');
-      if (submitBtn) {
-        await submitBtn.click();
-      }
+    // 3. 找到可见的发布按钮并点击
+    const allSubmitBtns = await page.$$('.reply-box-submit');
+    let visibleSubmitBtn = null;
+    for (const btn of allSubmitBtns) {
+      const visible = await btn.isVisible();
+      if (visible) { visibleSubmitBtn = btn; break; }
+    }
+    if (!visibleSubmitBtn) {
+      return { success: false, error: '未找到发布按钮' };
     }
 
+    await visibleSubmitBtn.click({ force: true });
     await sleep(2000, 3000);
 
+    // 4. 检查是否发布成功（输入框被清空）
+    const textareaValue = await visibleTextarea.evaluate(el => el.value);
+    const replied = !textareaValue || textareaValue.trim() === '';
+
     return {
-      success: true,
+      success: replied,
       action: 'replied',
       commentId: opts.commentId,
       replyContent: opts.content,
+      message: replied ? '回复成功' : '回复可能未成功，请检查页面',
     };
   } finally {
     await closeBrowser(context);
   }
+}
+
+// ── 内部辅助函数 ──
+
+function formatApiComment(c) {
+  return {
+    id: c.id_str,
+    author: c.user?.name || '',
+    authorAvatar: c.user?.avatar_url || '',
+    authorId: c.user?.id_str || '',
+    isFan: c.user?.follow_status === 2,
+    content: c.text || '',
+    time: formatTimestamp(c.create_time),
+    timestamp: c.create_time,
+    diggCount: c.digg_count || 0,
+    replyCount: c.reply_count || 0,
+    location: c.publish_loc_info || '',
+    articleTitle: c.article_info?.title?.substring(0, 60) || '',
+    articleType: c.article_info?.article_type || '',
+    articleUrl: c.article_info?.url || '',
+    replies: [],
+  };
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * 点击选中指定评论。
+ * 支持通过 commentId（精确 ID）或评论内容片段匹配。
+ */
+async function selectComment(page, commentId) {
+  // 先尝试用 API 拦截到的数据与 DOM 顺序对应
+  const items = await page.$$('.all-comment-item-wrap');
+  if (!items.length) return false;
+
+  for (const item of items) {
+    const text = await item.evaluate(el => el.innerText);
+    // 匹配评论 ID 或内容片段
+    if (text.includes(commentId)) {
+      await item.click();
+      await sleep(500, 800);
+      const isSelected = await item.evaluate(el => el.classList.contains('select'));
+      if (isSelected) return true;
+    }
+  }
+
+  // 如果是纯数字 ID，尝试通过 API 数据中的内容来匹配
+  // commentId 可能是评论的 id_str，需要与 DOM 中的评论内容对应
+  // 回退：通过索引（如 "1" 表示第一条）
+  const idx = parseInt(commentId);
+  if (!isNaN(idx) && idx >= 1 && idx <= items.length) {
+    await items[idx - 1].click();
+    await sleep(500, 800);
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * 从右侧面板提取指定评论的子评论（回复）。
+ * 需要先点击左侧第 index 条评论。
+ */
+async function extractRepliesForComment(page, index) {
+  const items = await page.$$('.all-comment-item-wrap');
+  if (index >= items.length) return [];
+
+  await items[index].click();
+  await sleep(1500, 2000);
+
+  return page.evaluate(() => {
+    const replies = [];
+    const subItems = document.querySelectorAll('.sub-comment-item');
+    for (const item of subItems) {
+      const author = item.querySelector('.sub-comment-item-title a')?.textContent?.trim() || '';
+      const avatar = item.querySelector('.sub-comment-item-avatar img')?.src || '';
+      // 提取时间
+      let time = '';
+      const allSpans = item.querySelectorAll('span, div');
+      for (const s of allSpans) {
+        if (s.children.length === 0 && /^\d{2}-\d{2}\s\d{2}:\d{2}$/.test(s.textContent?.trim())) {
+          time = s.textContent.trim();
+          break;
+        }
+      }
+      // 提取内容：用完整文本减去已知部分
+      const fullText = item.innerText?.trim() || '';
+      const noise = [author, time, '删除', '回复', '赞'];
+      let content = fullText;
+      for (const n of noise) {
+        if (n) content = content.replace(n, '');
+      }
+      content = content.replace(/\n+/g, ' ').trim();
+      if (content) {
+        replies.push({ author, avatar, content, time });
+      }
+    }
+    return replies;
+  });
+}
+
+async function extractCommentsFromDOM(page) {
+  return page.evaluate(() => {
+    const results = [];
+    const seen = new Set();
+    const items = document.querySelectorAll('.all-comment-item-wrap');
+
+    for (const wrap of items) {
+      const item = wrap.querySelector('.comment-item');
+      if (!item) continue;
+
+      const author = item.querySelector('.comment-item-title')?.textContent?.trim() || '';
+      const content = item.querySelector('.comment-item-content')?.textContent?.trim() || '';
+      const time = item.querySelector('.comment-item-timer')?.textContent?.trim() || '';
+      const articleEl = item.querySelector('.comment-item-header-extra-title');
+      const articleTitle = articleEl?.textContent?.trim()?.substring(0, 60) || '';
+      const articleUrl = articleEl?.href || '';
+
+      if (!content || seen.has(content)) continue;
+      seen.add(content);
+      results.push({ author, content, time, articleTitle, articleUrl });
+    }
+    return results;
+  });
 }

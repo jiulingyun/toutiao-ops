@@ -126,6 +126,7 @@ comment
   .description('查看评论列表')
   .option('--article-id <id>', '指定文章 ID')
   .option('--page <n>', '页码', '1')
+  .option('--with-replies', '同时获取每条评论的子评论/回复')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
     await run(listComments, opts);
