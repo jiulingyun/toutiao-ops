@@ -1,4 +1,4 @@
-import { launchBrowser, closeBrowser, sleep, browserFetch, waitForStable } from './browser.js';
+import { launchBrowser, closeBrowser, sleep, browserFetch, waitForStable, dismissOverlays } from './browser.js';
 import { ensureLoggedIn } from './auth-guard.js';
 
 const CONTENT_PAGE = 'https://mp.toutiao.com/profile_v4/manage/content/all';
@@ -39,6 +39,7 @@ export async function listContent(opts) {
     await page.goto(CONTENT_PAGE, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForStable(page);
     await sleep(2000, 3000);
+    await dismissOverlays(page);
 
     if (apiResponses.length > 0) {
       return {

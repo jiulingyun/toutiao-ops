@@ -59,8 +59,12 @@ publish
   .requiredOption('--title <title>', '文章标题')
   .option('--content <content>', '文章正文')
   .option('--content-file <path>', '从文件读取正文（Markdown）')
-  .option('--cover <path>', '封面图片路径')
-  .option('--tags <tags>', '标签，逗号分隔')
+  .option('--cover <path>', '封面图片路径（单图模式）')
+  .option('--cover-mode <mode>', '封面模式: single / triple / none', 'single')
+  .option('--first-publish', '勾选"头条首发"')
+  .option('--collection <name>', '添加至合集名称')
+  .option('--no-weitoutiao', '取消"同时发布微头条"（默认开启）')
+  .option('--declaration <items>', '作品声明，逗号分隔: 取材网络,引用站内,个人观点,引用AI,虚构演绎,投资观点,健康医疗')
   .option('--draft', '存为草稿而非直接发布')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
@@ -85,6 +89,10 @@ publish
   .description('发布微头条')
   .requiredOption('--content <content>', '微头条内容')
   .option('--images <paths>', '图片路径，逗号分隔')
+  .option('--topic <topic>', '话题名称（不含 #）')
+  .option('--first-publish', '勾选"头条首发"')
+  .option('--declaration <items>', '作品声明，逗号分隔: 取材网络,引用站内,个人观点,引用AI,虚构演绎,投资观点,健康医疗')
+  .option('--draft', '存草稿而非发布')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
     await run(publishWeitoutiao, opts);

@@ -1,4 +1,4 @@
-import { launchBrowser, closeBrowser, sleep, humanType, waitForStable } from './browser.js';
+import { launchBrowser, closeBrowser, sleep, humanType, waitForStable, dismissOverlays } from './browser.js';
 import { ensureLoggedIn } from './auth-guard.js';
 
 const UPLOAD_URL = 'https://mp.toutiao.com/profile_v4/xigua/upload-video';
@@ -14,6 +14,7 @@ export async function publishVideo(opts) {
     await page.goto(UPLOAD_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForStable(page);
     await sleep(1000, 2000);
+    await dismissOverlays(page);
 
     // ── 上传视频文件 ──
     const fileInput = await page.waitForSelector(
@@ -61,11 +62,9 @@ export async function publishVideo(opts) {
     await sleep(500, 1000);
 
     // ── 发布 ──
-    const publishBtn = await page.$('button:has-text("发布"), button:has-text("Publish")');
-    if (publishBtn) {
-      await sleep(300, 600);
-      await publishBtn.click();
-    }
+    await dismissOverlays(page);
+    const publishBtn = page.locator('button:has-text("发布")').first();
+    await publishBtn.click({ timeout: 10000 });
 
     await sleep(3000, 5000);
     await waitForStable(page);

@@ -1,4 +1,4 @@
-import { launchBrowser, closeBrowser, sleep, browserFetch, waitForStable } from './browser.js';
+import { launchBrowser, closeBrowser, sleep, browserFetch, waitForStable, dismissOverlays } from './browser.js';
 import { ensureLoggedIn } from './auth-guard.js';
 
 const TASK_LIST_URL = 'https://mp.toutiao.com/profile_v4/activity/task-list';
@@ -29,6 +29,7 @@ export async function listInspiration(opts) {
     await page.goto(TASK_LIST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForStable(page);
     await sleep(2000, 4000);
+    await dismissOverlays(page);
 
     if (apiResponses.length > 0) {
       return {
