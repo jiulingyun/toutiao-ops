@@ -9,23 +9,6 @@ metadata:
     requires:
       bins:
         - node
-    commands:
-      auth check: toutiao-ops auth check
-      auth login: toutiao-ops auth login
-      auth logout: toutiao-ops auth logout
-      auth list: toutiao-ops auth list
-      publish article: toutiao-ops publish article
-      publish video: toutiao-ops publish video
-      publish weitoutiao: toutiao-ops publish weitoutiao
-      content list: toutiao-ops content list
-      comment list: toutiao-ops comment list
-      comment reply: toutiao-ops comment reply
-      comment like: toutiao-ops comment like
-      analytics works: toutiao-ops analytics works
-      analytics fans: toutiao-ops analytics fans
-      analytics income: toutiao-ops analytics income
-      analytics content-detail: toutiao-ops analytics content-detail
-      inspiration: toutiao-ops inspiration
 ---
 
 # 今日头条运营技能
