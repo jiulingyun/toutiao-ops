@@ -57,6 +57,71 @@ export async function listComments(opts) {
 }
 
 /**
+ * 点赞评论。
+ * 通过 commentId（精确 ID）或评论内容片段定位评论，点击「赞」按钮。
+ */
+export async function likeComment(opts) {
+  const { context, page } = await launchBrowser(opts);
+  try {
+    await ensureLoggedIn(page);
+    await page.goto(COMMENT_PAGE, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await waitForStable(page);
+    await sleep(2000, 3000);
+    await dismissOverlays(page);
+
+    // 找到目标评论所在的 .all-comment-item-wrap
+    const items = await page.$$('.all-comment-item-wrap');
+    let targetItem = null;
+    for (const item of items) {
+      const text = await item.evaluate(el => el.innerText);
+      if (text.includes(opts.commentId)) {
+        targetItem = item;
+        break;
+      }
+    }
+
+    // 索引回退
+    if (!targetItem) {
+      const idx = parseInt(opts.commentId);
+      if (!isNaN(idx) && idx >= 1 && idx <= items.length) {
+        targetItem = items[idx - 1];
+      }
+    }
+
+    if (!targetItem) {
+      return { success: false, error: `未找到评论 ${opts.commentId}` };
+    }
+
+    // 点击该评论内的「赞」按钮（.digg）
+    const diggBtn = await targetItem.$('.digg');
+    if (!diggBtn) {
+      return { success: false, error: '未找到点赞按钮' };
+    }
+
+    // 记录点赞前状态
+    const beforeText = await diggBtn.evaluate(el => el.innerText?.trim());
+    await diggBtn.click();
+    await sleep(1000, 1500);
+
+    // 检查点赞后状态变化
+    const afterText = await diggBtn.evaluate(el => el.innerText?.trim());
+    const afterClass = await diggBtn.evaluate(el => el.className);
+    const liked = afterText !== beforeText || afterClass.includes('active') || afterClass.includes('liked');
+
+    return {
+      success: true,
+      action: 'liked',
+      commentId: opts.commentId,
+      before: beforeText,
+      after: afterText,
+      message: liked ? '点赞成功' : '点赞状态已切换（可能已取消赞）',
+    };
+  } finally {
+    await closeBrowser(context);
+  }
+}
+
+/**
  * 回复评论。
  * 流程：点击左侧评论 → 右侧面板展开 → 输入回复 → 点击发布。
  */

@@ -6,7 +6,7 @@ import { publishArticle } from './src/publish-article.js';
 import { publishVideo } from './src/publish-video.js';
 import { publishWeitoutiao } from './src/publish-weitoutiao.js';
 import { listContent } from './src/content-manage.js';
-import { listComments, replyComment } from './src/comment-manage.js';
+import { listComments, replyComment, likeComment } from './src/comment-manage.js';
 import { getWorksAnalytics, getFansAnalytics, getIncomeAnalytics, getContentDetail } from './src/analytics.js';
 import { listInspiration } from './src/inspiration.js';
 
@@ -135,11 +135,20 @@ comment
 comment
   .command('reply')
   .description('回复评论')
-  .requiredOption('--comment-id <id>', '评论 ID')
+  .requiredOption('--comment-id <id>', '评论 ID 或内容片段')
   .requiredOption('--content <content>', '回复内容')
   .option('--headless', '无头模式运行')
   .action(async (opts) => {
     await run(replyComment, opts);
+  });
+
+comment
+  .command('like')
+  .description('点赞评论')
+  .requiredOption('--comment-id <id>', '评论 ID 或内容片段')
+  .option('--headless', '无头模式运行')
+  .action(async (opts) => {
+    await run(likeComment, opts);
   });
 
 // ── analytics ──
