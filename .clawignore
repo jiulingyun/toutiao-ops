@@ -1,5 +1,6 @@
 node_modules/
-cli/node_modules/
+cli/
+examples/
 *.log
 .DS_Store
 ~/.toutiao-ops/
