@@ -1,0 +1,16 @@
+{
+  "name": "toutiao-ops-cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "今日头条创作者平台运营自动化 CLI",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "playwright": "^1.50.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}

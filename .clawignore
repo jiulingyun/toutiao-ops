@@ -1,0 +1,13 @@
+node_modules/
+cli/node_modules/
+*.log
+.DS_Store
+~/.toutiao-ops/
+browser-data/
+*.tmp
+*.cache
+screenshots/
+.env
+.env.*
+credentials.json
+package-lock.json
