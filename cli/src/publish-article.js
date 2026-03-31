@@ -225,6 +225,7 @@ async function uncheckWeitoutiao(page) {
 async function clickLabel(page, labelText) {
   try {
     const el = page.locator(`text=${labelText}`).first();
+    await el.scrollIntoViewIfNeeded().catch(() => {});
     await el.click({ timeout: 5000 });
     await sleep(200, 400);
   } catch {}
@@ -246,6 +247,7 @@ async function setDeclarations(page, declarationStr) {
     const fullLabel = labelMap[decl] || decl;
     try {
       const checkbox = page.locator(`text=${fullLabel}`).first();
+      await checkbox.scrollIntoViewIfNeeded().catch(() => {});
       await checkbox.click({ timeout: 3000 });
       await sleep(200, 400);
     } catch {}

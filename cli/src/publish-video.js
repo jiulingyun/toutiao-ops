@@ -84,14 +84,13 @@ export async function publishVideo(opts) {
     // ═══════════════════════════════════
     const needAdvanced = opts.collection || opts.declaration || (opts.visibility && opts.visibility !== 'public');
     if (needAdvanced) {
-      const advancedToggle = page.locator('text=高级设置').first();
-      await advancedToggle.click({ timeout: 5000 }).catch(() => {});
-      await sleep(500, 1000);
+      await expandAdvancedSettings(page);
 
       // ── 合集 ──
       if (opts.collection) {
         try {
           const addBtn = page.locator('text=选择合集').first();
+          await addBtn.scrollIntoViewIfNeeded().catch(() => {});
           await addBtn.click({ timeout: 5000 });
           await sleep(500, 1000);
           const item = page.locator(`text=${opts.collection}`).first();
@@ -114,7 +113,9 @@ export async function publishVideo(opts) {
         const labelMap = { fans: '粉丝可见', private: '仅我可见' };
         const label = labelMap[opts.visibility];
         if (label) {
-          await clickLabel(page, label);
+          const radio = page.locator(`text=${label}`).first();
+          await radio.scrollIntoViewIfNeeded().catch(() => {});
+          await radio.click({ timeout: 5000 }).catch(() => {});
         }
       }
       await sleep(300, 500);
@@ -188,6 +189,33 @@ async function waitForUpload(page) {
   throw new Error('视频上传超时（10 分钟）');
 }
 
+/**
+ * 确保"高级设置"处于展开状态。
+ * 先检查内部元素是否可见，不可见才点击展开，避免误折叠。
+ */
+async function expandAdvancedSettings(page) {
+  const toggle = page.locator('text=高级设置').first();
+  await toggle.scrollIntoViewIfNeeded().catch(() => {});
+  await sleep(300, 500);
+
+  // 检查高级设置内部的标志性元素是否已经可见
+  const alreadyExpanded = await page.locator('text=作品声明').first().isVisible().catch(() => false)
+    || await page.locator('text=选择合集').first().isVisible().catch(() => false)
+    || await page.locator('text=谁可以看').first().isVisible().catch(() => false);
+
+  if (!alreadyExpanded) {
+    await toggle.click({ timeout: 5000 }).catch(() => {});
+    await sleep(800, 1200);
+    // 验证展开成功
+    const expanded = await page.locator('text=作品声明').first().isVisible({ timeout: 5000 }).catch(() => false);
+    if (!expanded) {
+      // 再试一次
+      await toggle.click({ timeout: 5000 }).catch(() => {});
+      await sleep(800, 1200);
+    }
+  }
+}
+
 async function setDeclarations(page, declarationStr) {
   const declarations = declarationStr.split(',').map(d => d.trim()).filter(Boolean);
   const labelMap = {
@@ -204,6 +232,7 @@ async function setDeclarations(page, declarationStr) {
     const fullLabel = labelMap[decl] || decl;
     try {
       const checkbox = page.locator(`text=${fullLabel}`).first();
+      await checkbox.scrollIntoViewIfNeeded().catch(() => {});
       await checkbox.click({ timeout: 3000 });
       await sleep(200, 400);
     } catch {}
