@@ -102,21 +102,22 @@ export async function publishWeitoutiao(opts) {
 
 async function uploadImages(page, imagePaths) {
   try {
-    const fileInput = await page.$('input[type="file"][accept*="image"]');
-    if (fileInput) {
-      await fileInput.setInputFiles(imagePaths);
-      await sleep(2000, 4000);
-      return;
-    }
-    // 备选：点击图片按钮触发上传
+    // 先点击"图片"按钮打开上传对话框
     const imgBtn = page.locator('text=图片').first();
     await imgBtn.click({ timeout: 5000 });
-    await sleep(500, 1000);
-    const input = await page.$('input[type="file"][accept*="image"]');
-    if (input) {
-      await input.setInputFiles(imagePaths);
-      await sleep(2000, 4000);
-    }
+    await sleep(800, 1200);
+
+    // 在对话框中找到文件输入并上传
+    const fileInput = page.locator('input[type="file"][accept*="image"]').first();
+    await fileInput.setInputFiles(imagePaths);
+    await sleep(3000, 5000);
+
+    // 等待图片上传完成，点击"确定"按钮关闭对话框
+    const confirmBtn = page.locator('button:has-text("确定")').first();
+    await confirmBtn.waitFor({ timeout: 10000 });
+    await sleep(500, 800);
+    await confirmBtn.click();
+    await sleep(1000, 2000);
   } catch {
     // 图片上传失败不阻塞发布
   }

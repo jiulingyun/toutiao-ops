@@ -58,20 +58,8 @@ export async function publishVideo(opts) {
       await sleep(300, 600);
     }
 
-    // ── 封面上传 ──
-    if (opts.cover) {
-      try {
-        const coverTrigger = page.locator('text=上传封面').first();
-        await coverTrigger.click({ timeout: 5000 });
-        await sleep(500, 1000);
-        const imgInput = page.locator('input[type="file"][accept*="image"]').first();
-        await imgInput.setInputFiles(opts.cover);
-        await sleep(2000, 4000);
-        const confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认")').first();
-        await confirmBtn.click({ timeout: 5000 }).catch(() => {});
-        await sleep(500, 1000);
-      } catch {}
-    }
+    // ── 封面（必填）──
+    await handleVideoCover(page, opts.cover);
     await sleep(500, 800);
 
     // ── 视频简介 ──
@@ -200,6 +188,46 @@ async function setDeclarations(page, declarationStr) {
       await checkbox.click({ timeout: 3000 });
       await sleep(200, 400);
     } catch {}
+  }
+}
+
+async function handleVideoCover(page, coverPath) {
+  if (coverPath) {
+    // 用户提供了封面图片，上传
+    try {
+      const coverTrigger = page.locator('text=上传封面').first();
+      await coverTrigger.click({ timeout: 5000 });
+      await sleep(500, 1000);
+      const imgInput = page.locator('input[type="file"][accept*="image"]').first();
+      await imgInput.setInputFiles(coverPath);
+      await sleep(3000, 5000);
+      const confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认")').first();
+      await confirmBtn.click({ timeout: 10000 }).catch(() => {});
+      await sleep(1000, 2000);
+    } catch {}
+  } else {
+    // 没有提供封面，尝试使用"建议的封面"中的第一帧
+    try {
+      const suggestLink = page.locator('text=建议的封面').first();
+      await suggestLink.click({ timeout: 5000 });
+      await sleep(1500, 2500);
+
+      // 在弹出的封面选择面板中，点击第一个推荐的封面
+      const firstFrame = page.locator('[class*="cover-item"], [class*="thumb"], [class*="frame"], [class*="recommend"] img').first();
+      await firstFrame.click({ timeout: 5000 });
+      await sleep(500, 1000);
+
+      const confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认")').first();
+      await confirmBtn.click({ timeout: 5000 }).catch(() => {});
+      await sleep(1000, 2000);
+    } catch {
+      // 如果建议封面也失败了，尝试直接点击封面区域的 + 号触发截帧
+      try {
+        const plusBtn = page.locator('text=上传封面').first();
+        await plusBtn.click({ timeout: 3000 });
+        await sleep(1000, 2000);
+      } catch {}
+    }
   }
 }
 

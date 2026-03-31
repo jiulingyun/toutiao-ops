@@ -162,8 +162,8 @@ export async function dismissOverlays(page) {
         }
       }
 
-      // 隐藏所有 modal wrapper
-      document.querySelectorAll('.byte-modal-wrapper, [class*="zoomModal"], [class*="modal-mask"]').forEach(el => {
+      // 隐藏所有 modal wrapper 和 drawer
+      document.querySelectorAll('.byte-modal-wrapper, [class*="zoomModal"], [class*="modal-mask"], .byte-drawer-wrapper, [class*="drawer-mask"]').forEach(el => {
         el.style.display = 'none';
         count++;
       });

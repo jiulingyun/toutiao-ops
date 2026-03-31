@@ -104,12 +104,21 @@ export async function publishArticle(opts) {
     }
 
     // 点击"预览并发布"按钮
-    const publishBtn = page.locator('button:has-text("预览并发布"), button:has-text("发布")').first();
-    await publishBtn.click({ timeout: 10000 });
+    await dismissOverlays(page);
+    const publishBtn = page.locator('button:has-text("预览并发布")').first();
+    await publishBtn.scrollIntoViewIfNeeded().catch(() => {});
+    await sleep(300, 500);
+    await publishBtn.click({ force: true, timeout: 10000 });
+    await sleep(3000, 5000);
+    await waitForStable(page);
+
+    // 预览页面需要再次点击"确认发布"
+    const confirmPublish = page.locator('button:has-text("确认发布"), button:has-text("发布")').first();
+    await confirmPublish.click({ timeout: 10000 }).catch(() => {});
     await sleep(2000, 4000);
 
-    // 可能弹出确认对话框，点击确认
-    const confirmBtn = page.locator('button:has-text("确认发布"), button:has-text("确定")').first();
+    // 可能还有二次确认弹窗
+    const confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认")').first();
     await confirmBtn.click({ timeout: 5000 }).catch(() => {});
 
     await sleep(2000, 4000);
@@ -135,26 +144,45 @@ async function setCoverMode(page, mode, coverPath) {
     };
     const label = modeLabels[mode] || modeLabels.single;
 
-    // 点击对应的封面模式单选
     const radio = page.locator(`text=${label}`).first();
     await radio.click({ timeout: 5000 });
     await sleep(500, 800);
 
-    // 如果选了 single 或 triple 且提供了封面图，上传
     if (mode !== 'none' && coverPath) {
-      const fileInput = await page.$('input[type="file"][accept*="image"]');
-      if (fileInput) {
-        const paths = coverPath.split(',').map(p => p.trim()).filter(Boolean);
-        await fileInput.setInputFiles(paths);
-        await sleep(2000, 4000);
-        // 可能弹出裁剪确认框
-        const confirmBtn = page.locator('button:has-text("确定"), button:has-text("确认")').first();
-        await confirmBtn.click({ timeout: 5000 }).catch(() => {});
-        await sleep(500, 1000);
+      const paths = coverPath.split(',').map(p => p.trim()).filter(Boolean);
+
+      // 点击封面区域的 + 号，打开图片上传侧边栏
+      const coverArea = page.locator('[class*="cover"] [class*="add"], [class*="cover"] [class*="upload"], [class*="cover"] [class*="plus"]').first();
+      await coverArea.click({ timeout: 5000 }).catch(async () => {
+        // 备选：点击"预览"旁的 + 号
+        await page.locator('[class*="cover-upload"]').first().click({ timeout: 3000 });
+      });
+      await sleep(1000, 2000);
+
+      // 侧边栏打开后，点击"本地上传"按钮触发文件选择
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 10000 }),
+        page.locator('text=本地上传').first().click({ timeout: 5000 }),
+      ]);
+
+      if (fileChooser) {
+        await fileChooser.setFiles(paths);
+        await sleep(3000, 5000);
       }
+
+      // 等待图片上传完成，点击"确定"关闭侧边栏
+      const confirmBtn = page.locator('.byte-drawer-wrapper button:has-text("确定"), .upload-image-panel button:has-text("确定")').first();
+      await confirmBtn.waitFor({ timeout: 10000 });
+      await sleep(500, 800);
+      await confirmBtn.click();
+      await sleep(1000, 2000);
     }
   } catch {
-    // 封面设置失败不阻塞
+    // 封面上传失败，尝试关闭可能残留的侧边栏
+    await page.locator('.byte-drawer-wrapper button:has-text("取消")').first()
+      .click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+    await sleep(500, 800);
   }
 }
 
