@@ -9,6 +9,7 @@ import { listContent } from './src/content-manage.js';
 import { listComments, replyComment, likeComment } from './src/comment-manage.js';
 import { getWorksAnalytics, getFansAnalytics, getIncomeAnalytics, getContentDetail } from './src/analytics.js';
 import { listInspiration } from './src/inspiration.js';
+import { checkForUpdates } from './src/update-check.js';
 
 const program = new Command();
 
@@ -204,14 +205,16 @@ program
 
 // ── runner ──
 async function run(fn, subOpts) {
+  const updateCheck = checkForUpdates();
   try {
-    // 将全局 --account 合并到子命令 opts 中
     const globalOpts = program.opts();
     const opts = { ...subOpts, account: globalOpts.account };
     const result = await fn(opts);
+    await updateCheck;
     console.log(JSON.stringify(result, null, 2));
     process.exit(0);
   } catch (err) {
+    await updateCheck.catch(() => {});
     console.error(JSON.stringify({ error: err.message, stack: err.stack }, null, 2));
     process.exit(1);
   }
