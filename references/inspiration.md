@@ -7,7 +7,7 @@
 ## 命令
 
 ```bash
-node {baseDir}/cli/index.js inspiration [--type activity]
+toutiao-ops inspiration [--type activity]
 ```
 
 ## 参数
@@ -35,10 +35,10 @@ node {baseDir}/cli/index.js inspiration [--type activity]
 
 ```bash
 # 创作活动（默认）
-node {baseDir}/cli/index.js inspiration
+toutiao-ops inspiration
 
 # 热点推荐
-node {baseDir}/cli/index.js inspiration --type hotspot
+toutiao-ops inspiration --type hotspot
 ```
 
 ## 数据获取策略

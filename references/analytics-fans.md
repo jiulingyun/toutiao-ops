@@ -7,7 +7,7 @@
 ## 命令
 
 ```bash
-node {baseDir}/cli/index.js analytics fans
+toutiao-ops analytics fans
 ```
 
 ## 参数

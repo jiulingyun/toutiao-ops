@@ -11,19 +11,19 @@
 ### 查看评论列表
 
 ```bash
-node {baseDir}/cli/index.js comment list [--with-replies]
+toutiao-ops comment list [--with-replies]
 ```
 
 ### 回复评论
 
 ```bash
-node {baseDir}/cli/index.js comment reply --comment-id "评论ID或内容片段" --content "回复内容"
+toutiao-ops comment reply --comment-id "评论ID或内容片段" --content "回复内容"
 ```
 
 ### 点赞评论
 
 ```bash
-node {baseDir}/cli/index.js comment like --comment-id "评论ID或内容片段"
+toutiao-ops comment like --comment-id "评论ID或内容片段"
 ```
 
 ## 参数

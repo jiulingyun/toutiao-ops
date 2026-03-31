@@ -9,13 +9,13 @@
 ### 作品数据概览
 
 ```bash
-node {baseDir}/cli/index.js analytics works [--type all]
+toutiao-ops analytics works [--type all]
 ```
 
 ### 单个作品详细数据
 
 ```bash
-node {baseDir}/cli/index.js analytics content-detail [--content-id "作品ID"] [--content-type 2]
+toutiao-ops analytics content-detail [--content-id "作品ID"] [--content-type 2]
 ```
 
 ## 参数

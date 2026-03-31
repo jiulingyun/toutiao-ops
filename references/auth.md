@@ -10,11 +10,11 @@
 
 ```bash
 # 操作默认账号
-node {baseDir}/cli/index.js auth check
+toutiao-ops auth check
 
 # 操作指定账号
-node {baseDir}/cli/index.js --account work auth check
-node {baseDir}/cli/index.js --account personal auth login
+toutiao-ops --account work auth check
+toutiao-ops --account personal auth login
 ```
 
 数据目录结构：
@@ -37,7 +37,7 @@ node {baseDir}/cli/index.js --account personal auth login
 ### 检测登录状态
 
 ```bash
-node {baseDir}/cli/index.js [--account <name>] auth check
+toutiao-ops [--account <name>] auth check
 ```
 
 输出示例（已登录）：
@@ -63,7 +63,7 @@ node {baseDir}/cli/index.js [--account <name>] auth check
 ### 扫码登录
 
 ```bash
-node {baseDir}/cli/index.js [--account <name>] auth login
+toutiao-ops [--account <name>] auth login
 ```
 
 登录流程分两阶段输出：
@@ -101,7 +101,7 @@ node {baseDir}/cli/index.js [--account <name>] auth login
 ### 退出登录
 
 ```bash
-node {baseDir}/cli/index.js [--account <name>] auth logout
+toutiao-ops [--account <name>] auth logout
 ```
 
 清除指定账号的浏览器缓存、截图和元信息。
@@ -118,7 +118,7 @@ node {baseDir}/cli/index.js [--account <name>] auth logout
 ### 列出所有账号
 
 ```bash
-node {baseDir}/cli/index.js auth list
+toutiao-ops auth list
 ```
 
 ```json

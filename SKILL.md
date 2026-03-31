@@ -10,22 +10,22 @@ metadata:
       bins:
         - node
     commands:
-      auth check: node {baseDir}/cli/index.js auth check
-      auth login: node {baseDir}/cli/index.js auth login
-      auth logout: node {baseDir}/cli/index.js auth logout
-      auth list: node {baseDir}/cli/index.js auth list
-      publish article: node {baseDir}/cli/index.js publish article
-      publish video: node {baseDir}/cli/index.js publish video
-      publish weitoutiao: node {baseDir}/cli/index.js publish weitoutiao
-      content list: node {baseDir}/cli/index.js content list
-      comment list: node {baseDir}/cli/index.js comment list
-      comment reply: node {baseDir}/cli/index.js comment reply
-      comment like: node {baseDir}/cli/index.js comment like
-      analytics works: node {baseDir}/cli/index.js analytics works
-      analytics fans: node {baseDir}/cli/index.js analytics fans
-      analytics income: node {baseDir}/cli/index.js analytics income
-      analytics content-detail: node {baseDir}/cli/index.js analytics content-detail
-      inspiration: node {baseDir}/cli/index.js inspiration
+      auth check: toutiao-ops auth check
+      auth login: toutiao-ops auth login
+      auth logout: toutiao-ops auth logout
+      auth list: toutiao-ops auth list
+      publish article: toutiao-ops publish article
+      publish video: toutiao-ops publish video
+      publish weitoutiao: toutiao-ops publish weitoutiao
+      content list: toutiao-ops content list
+      comment list: toutiao-ops comment list
+      comment reply: toutiao-ops comment reply
+      comment like: toutiao-ops comment like
+      analytics works: toutiao-ops analytics works
+      analytics fans: toutiao-ops analytics fans
+      analytics income: toutiao-ops analytics income
+      analytics content-detail: toutiao-ops analytics content-detail
+      inspiration: toutiao-ops inspiration
 ---
 
 # 今日头条运营技能
@@ -34,9 +34,9 @@ metadata:
 
 ## 首次使用
 
-1. 安装依赖：`cd {baseDir}/cli && npm install`
-2. 安装浏览器：`cd {baseDir}/cli && npx playwright install chromium`
-3. 登录：`node {baseDir}/cli/index.js auth login`（首次需手动扫码）
+1. 全局安装 CLI 工具：`npm install -g @openclaw-cn/toutiao-ops`
+2. 安装完成后会自动下载 Chromium 浏览器，若失败则手动执行：`npx playwright install chromium`
+3. 登录：`toutiao-ops auth login`（首次需手动扫码）
 
 ## 多账号
 
@@ -44,21 +44,21 @@ metadata:
 
 ```bash
 # 登录第二个账号
-node {baseDir}/cli/index.js --account work auth login
+toutiao-ops --account work auth login
 
 # 用指定账号发布文章
-node {baseDir}/cli/index.js --account work publish article --title "..."
+toutiao-ops --account work publish article --title "..."
 
 # 查看所有账号
-node {baseDir}/cli/index.js auth list
+toutiao-ops auth list
 ```
 
 每个账号的浏览器会话独立隔离，互不影响。
 
 ## 执行规则
 
-- 任何操作前先执行 `auth check` 确认登录状态
-- 如果未登录，先执行 `auth login`，将输出的二维码截图展示给用户扫码
+- 任何操作前先执行 `toutiao-ops auth check` 确认登录状态
+- 如果未登录，先执行 `toutiao-ops auth login`，将输出的二维码截图展示给用户扫码
 - 发布类操作使用浏览器自动化（模拟真人），数据类操作使用浏览器内 API
 - 所有命令输出 JSON 格式，方便解析
 
@@ -81,24 +81,24 @@ node {baseDir}/cli/index.js auth list
 
 | 命令 | 说明 |
 |------|------|
-| `auth check` | 检测登录状态 |
-| `auth login` | 扫码登录（输出二维码截图路径，需展示给用户） |
-| `auth logout` | 清除指定账号的登录缓存 |
-| `auth list` | 列出所有已保存的账号 |
-| `publish article --title "..." --content "..."` | 发布文章（支持 --cover-mode / --first-publish / --collection / --declaration 等） |
-| `publish video --title "..." --file "path"` | 发布视频（支持 --topic / --cover / --gen-article / --visibility 等） |
-| `publish weitoutiao --content "..."` | 发布微头条（支持 --images / --topic / --first-publish / --declaration 等） |
-| `content list` | 查看作品列表（支持 --type / --status） |
-| `comment list` | 查看评论列表（支持 --with-replies 获取子评论） |
-| `comment reply --comment-id "..." --content "..."` | 回复评论（支持 ID / 内容片段 / 序号定位） |
-| `comment like --comment-id "..."` | 点赞评论（支持 ID / 内容片段 / 序号定位） |
-| `analytics works` | 作品数据概览（支持 --type article / video / weitoutiao） |
-| `analytics fans` | 粉丝数据（含性别/年龄/地域/机型价格分布 + 粉丝偏好） |
-| `analytics income` | 收益数据（支持 --type article / video） |
-| `analytics content-detail` | 单个作品详细数据（支持 --content-id / --content-type） |
-| `inspiration` | 创作灵感（支持 --type activity / hotspot） |
+| `toutiao-ops auth check` | 检测登录状态 |
+| `toutiao-ops auth login` | 扫码登录（输出二维码截图路径，需展示给用户） |
+| `toutiao-ops auth logout` | 清除指定账号的登录缓存 |
+| `toutiao-ops auth list` | 列出所有已保存的账号 |
+| `toutiao-ops publish article --title "..." --content "..."` | 发布文章（支持 --cover-mode / --first-publish / --collection / --declaration 等） |
+| `toutiao-ops publish video --title "..." --file "path"` | 发布视频（支持 --topic / --cover / --gen-article / --visibility 等） |
+| `toutiao-ops publish weitoutiao --content "..."` | 发布微头条（支持 --images / --topic / --first-publish / --declaration 等） |
+| `toutiao-ops content list` | 查看作品列表（支持 --type / --status） |
+| `toutiao-ops comment list` | 查看评论列表（支持 --with-replies 获取子评论） |
+| `toutiao-ops comment reply --comment-id "..." --content "..."` | 回复评论（支持 ID / 内容片段 / 序号定位） |
+| `toutiao-ops comment like --comment-id "..."` | 点赞评论（支持 ID / 内容片段 / 序号定位） |
+| `toutiao-ops analytics works` | 作品数据概览（支持 --type article / video / weitoutiao） |
+| `toutiao-ops analytics fans` | 粉丝数据（含性别/年龄/地域/机型价格分布 + 粉丝偏好） |
+| `toutiao-ops analytics income` | 收益数据（支持 --type article / video） |
+| `toutiao-ops analytics content-detail` | 单个作品详细数据（支持 --content-id / --content-type） |
+| `toutiao-ops inspiration` | 创作灵感（支持 --type activity / hotspot） |
 
 ## 通用选项
 
-- `--account <name>`：指定账号（默认 default），加在 `toutiao` 后、子命令前
+- `--account <name>`：指定账号（默认 default），加在 `toutiao-ops` 后、子命令前
 - `--headless`：无头模式运行（默认有头模式）

@@ -7,7 +7,7 @@
 ## 命令
 
 ```bash
-node {baseDir}/cli/index.js publish video --title "视频标题" --file "/path/to/video.mp4"
+toutiao-ops publish video --title "视频标题" --file "/path/to/video.mp4"
 ```
 
 ## 参数
@@ -30,10 +30,10 @@ node {baseDir}/cli/index.js publish video --title "视频标题" --file "/path/t
 
 ```bash
 # 基础发布
-node {baseDir}/cli/index.js publish video --title "我的视频" --file "/path/to/video.mp4"
+toutiao-ops publish video --title "我的视频" --file "/path/to/video.mp4"
 
 # 完整参数
-node {baseDir}/cli/index.js publish video \
+toutiao-ops publish video \
   --title "户外探险记录" \
   --file "/path/to/video.mov" \
   --cover "/path/to/cover.jpg" \
@@ -45,7 +45,7 @@ node {baseDir}/cli/index.js publish video \
   --visibility public
 
 # 存草稿
-node {baseDir}/cli/index.js publish video --title "草稿" --file "/path/to/video.mp4" --draft
+toutiao-ops publish video --title "草稿" --file "/path/to/video.mp4" --draft
 ```
 
 ## 自动化流程

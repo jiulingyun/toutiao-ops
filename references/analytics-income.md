@@ -7,7 +7,7 @@
 ## 命令
 
 ```bash
-node {baseDir}/cli/index.js analytics income [--type all]
+toutiao-ops analytics income [--type all]
 ```
 
 ## 参数
@@ -29,13 +29,13 @@ node {baseDir}/cli/index.js analytics income [--type all]
 
 ```bash
 # 收益总览
-node {baseDir}/cli/index.js analytics income
+toutiao-ops analytics income
 
 # 图文收益
-node {baseDir}/cli/index.js analytics income --type article
+toutiao-ops analytics income --type article
 
 # 视频收益
-node {baseDir}/cli/index.js analytics income --type video
+toutiao-ops analytics income --type video
 ```
 
 ## 数据获取策略

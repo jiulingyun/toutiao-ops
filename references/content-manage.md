@@ -7,7 +7,7 @@
 ## 命令
 
 ```bash
-node {baseDir}/cli/index.js content list [--type all] [--status published] [--page 1] [--limit 20]
+toutiao-ops content list [--type all] [--status published] [--page 1] [--limit 20]
 ```
 
 ## 参数
