@@ -4,6 +4,8 @@ import { launchBrowser, closeBrowser, sleep, waitForStable, dismissOverlays } fr
 import { ensureLoggedIn } from './auth-guard.js';
 
 const PUBLISH_URL = 'https://mp.toutiao.com/profile_v4/graphic/publish';
+const TITLE_MAX_LEN = 30;
+const TITLE_MIN_LEN = 2;
 
 /**
  * 发布图文文章。
@@ -28,12 +30,20 @@ export async function publishArticle(opts) {
     await sleep(1500, 2500);
     await dismissOverlays(page);
 
-    // ── 标题 ──
+    // ── 标题（2~30 字） ──
+    let title = opts.title;
+    if (title.length < TITLE_MIN_LEN) {
+      throw new Error(`标题过短：至少 ${TITLE_MIN_LEN} 个字，当前 ${title.length} 个字`);
+    }
+    if (title.length > TITLE_MAX_LEN) {
+      title = title.slice(0, TITLE_MAX_LEN);
+      process.stderr.write(`[warn] 标题超过 ${TITLE_MAX_LEN} 字限制，已自动截断为：${title}\n`);
+    }
     const titleSelector = 'textarea[placeholder*="标题"], input[placeholder*="标题"], [class*="title"] textarea, [class*="title"] input';
     await page.waitForSelector(titleSelector, { timeout: 15000 });
     await sleep(300, 600);
     await page.click(titleSelector, { force: true });
-    await page.keyboard.type(opts.title, { delay: 50 + Math.random() * 80 });
+    await page.keyboard.type(title, { delay: 50 + Math.random() * 80 });
     await sleep(500, 1000);
 
     // ── 正文 ──
@@ -92,7 +102,7 @@ export async function publishArticle(opts) {
       return {
         success: true,
         action: 'draft_saved',
-        title: opts.title,
+        title,
         url: page.url(),
       };
     }
@@ -121,7 +131,7 @@ export async function publishArticle(opts) {
     return {
       success: true,
       action: 'published',
-      title: opts.title,
+      title,
       url: page.url(),
     };
   } finally {

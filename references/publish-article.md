@@ -16,7 +16,7 @@ toutiao-ops publish article --title "文章标题" --content "# Markdown 正文"
 
 | 参数 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
-| `--title` | 是 | - | 文章标题 |
+| `--title` | 是 | - | 文章标题（**2~30 个字**，超出自动截断） |
 | `--content` | 否* | - | 文章正文（支持 Markdown 语法） |
 | `--content-file` | 否* | - | 从文件读取正文（`.md` 文件自动识别为 Markdown） |
 | `--format` | 否 | `markdown` | 正文格式：`markdown`（富文本排版）/ `text`（纯文本逐字输入） |
@@ -123,6 +123,7 @@ toutiao-ops publish article --title "草稿标题" --content-file draft.md --dra
 
 ## 注意事项
 
+- **标题限制 2~30 个字**：头条平台强制要求，超过 30 字会被自动截断。生成标题时务必精炼简洁
 - **优先使用 Markdown 格式**（`--format markdown`，默认值），发布的文章将具有专业排版效果
 - `.md` 文件通过 `--content-file` 传入时自动识别为 Markdown，无需额外指定 `--format`
 - `--content` 参数中的 `\n` 会被转换为真实换行符
