@@ -1,7 +1,7 @@
 ---
 name: 今日头条运营大师
 description: 今日头条创作者平台全流程运营自动化。支持多账号管理、登录管理、文章/视频/微头条发布、作品管理、评论管理、数据分析、创作灵感获取。使用浏览器自动化模拟真人操作发布内容，浏览器内 API 获取数据。当用户需要运营头条号、发布内容、查看数据或管理评论时使用此技能。
-version: 1.1.0
+version: 1.1.2
 icon: 📰
 metadata:
   clawdbot:
@@ -43,6 +43,7 @@ toutiao-ops auth list
 - 任何操作前先执行 `toutiao-ops auth check` 确认登录状态
 - 如果未登录，先执行 `toutiao-ops auth login`，将输出的二维码截图展示给用户扫码
 - 发布类操作使用浏览器自动化（模拟真人），数据类操作使用浏览器内 API
+- **发布文章时，正文内容应使用 Markdown 格式编写**（默认 `--format markdown`），CLI 会自动将 Markdown 渲染为富文本并粘贴到编辑器，实现标题、加粗、列表、表格、引用等专业排版
 - 所有命令输出 JSON 格式，方便解析
 
 ## 模块索引
@@ -50,7 +51,7 @@ toutiao-ops auth list
 执行前先读取对应模块文档：
 
 - 登录与会话管理 -> `references/auth.md`
-- 文章发布 -> `references/publish-article.md`
+- 文章发布（支持 Markdown 富文本排版） -> `references/publish-article.md`
 - 视频发布 -> `references/publish-video.md`
 - 微头条发布 -> `references/publish-weitoutiao.md`
 - 作品管理 -> `references/content-manage.md`
@@ -68,7 +69,7 @@ toutiao-ops auth list
 | `toutiao-ops auth login` | 扫码登录（输出二维码截图路径，需展示给用户） |
 | `toutiao-ops auth logout` | 清除指定账号的登录缓存 |
 | `toutiao-ops auth list` | 列出所有已保存的账号 |
-| `toutiao-ops publish article --title "..." --content "..."` | 发布文章（支持 --cover-mode / --first-publish / --collection / --declaration 等） |
+| `toutiao-ops publish article --title "..." --content "..."` | 发布文章（默认 Markdown 富文本排版，支持 --format / --content-file / --cover-mode 等） |
 | `toutiao-ops publish video --title "..." --file "path"` | 发布视频（支持 --topic / --cover / --gen-article / --visibility 等） |
 | `toutiao-ops publish weitoutiao --content "..."` | 发布微头条（支持 --images / --topic / --first-publish / --declaration 等） |
 | `toutiao-ops content list` | 查看作品列表（支持 --type / --status） |
