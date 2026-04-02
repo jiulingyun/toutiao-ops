@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import { marked } from 'marked';
 import { launchBrowser, closeBrowser, sleep, waitForStable, dismissOverlays } from './browser.js';
 import { ensureLoggedIn } from './auth-guard.js';
 
@@ -40,7 +41,6 @@ export async function publishArticle(opts) {
     if (opts.contentFile) {
       content = readFileSync(opts.contentFile, 'utf-8');
     }
-    // 将字面量 \n 转换为真正的换行符
     content = content.replace(/\\n/g, '\n');
     if (content) {
       const editorSelector = '[contenteditable="true"]';
@@ -49,16 +49,10 @@ export async function publishArticle(opts) {
       await page.click(editorSelector, { force: true });
       await sleep(200, 400);
 
-      const paragraphs = content.split('\n');
-      for (let i = 0; i < paragraphs.length; i++) {
-        const para = paragraphs[i];
-        if (para) {
-          await page.keyboard.type(para, { delay: 30 + Math.random() * 50 });
-        }
-        if (i < paragraphs.length - 1) {
-          await page.keyboard.press('Enter');
-          await sleep(100, 300);
-        }
+      if (opts.format === 'markdown' || opts.contentFile?.match(/\.md$/i)) {
+        await pasteMarkdownAsRichText(page, content, editorSelector);
+      } else {
+        await typePlainText(page, content);
       }
     }
     await sleep(500, 1000);
@@ -251,5 +245,41 @@ async function setDeclarations(page, declarationStr) {
       await checkbox.click({ timeout: 3000 });
       await sleep(200, 400);
     } catch {}
+  }
+}
+
+async function pasteMarkdownAsRichText(page, markdownContent, editorSelector) {
+  const html = marked.parse(markdownContent, { breaks: true, gfm: true });
+  await page.evaluate(
+    ({ html, selector }) => {
+      const editor = document.querySelector(selector);
+      if (!editor) return;
+      editor.focus();
+      const dt = new DataTransfer();
+      dt.setData('text/html', html);
+      dt.setData('text/plain', editor.textContent);
+      const evt = new ClipboardEvent('paste', {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      });
+      editor.dispatchEvent(evt);
+    },
+    { html, selector: editorSelector },
+  );
+  await sleep(500, 1000);
+}
+
+async function typePlainText(page, content) {
+  const paragraphs = content.split('\n');
+  for (let i = 0; i < paragraphs.length; i++) {
+    const para = paragraphs[i];
+    if (para) {
+      await page.keyboard.type(para, { delay: 30 + Math.random() * 50 });
+    }
+    if (i < paragraphs.length - 1) {
+      await page.keyboard.press('Enter');
+      await sleep(100, 300);
+    }
   }
 }
