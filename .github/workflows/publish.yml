@@ -40,15 +40,19 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Setup Node.js for GitHub Packages
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://npm.pkg.github.com'
-
       - name: Publish to GitHub Packages
         working-directory: cli
-        run: npm publish --access public
+        run: |
+          echo "@jiulingyun:registry=https://npm.pkg.github.com" > ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+            pkg.name = '@jiulingyun/toutiao-ops';
+            pkg.publishConfig = { registry: 'https://npm.pkg.github.com' };
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
