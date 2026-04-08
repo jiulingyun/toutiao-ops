@@ -20,7 +20,7 @@ toutiao-ops publish article --title "文章标题" --content "# Markdown 正文"
 | `--content` | 否* | - | 文章正文（支持 Markdown 语法） |
 | `--content-file` | 否* | - | 从文件读取正文（`.md` 文件自动识别为 Markdown） |
 | `--format` | 否 | `markdown` | 正文格式：`markdown`（富文本排版）/ `text`（纯文本逐字输入） |
-| `--cover` | 否 | - | 封面图片本地路径 |
+| `--cover` | 是 | - | 封面图片本地路径 |
 | `--cover-mode` | 否 | `single` | 封面模式：`single`（单图）/ `triple`（三图）/ `none`（无封面） |
 | `--first-publish` | 否 | false | 勾选「头条首发」 |
 | `--collection` | 否 | - | 添加至合集名称 |

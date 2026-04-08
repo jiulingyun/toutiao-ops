@@ -61,7 +61,7 @@ publish
   .option('--content <content>', '文章正文')
   .option('--content-file <path>', '从文件读取正文（支持 .md 文件自动识别为 Markdown）')
   .option('--format <format>', '正文格式: text（纯文本）/ markdown（富文本排版）', 'markdown')
-  .option('--cover <path>', '封面图片路径（单图模式）')
+  .requiredOption('--cover <path>', '封面图片路径（必填，单图模式）')
   .option('--cover-mode <mode>', '封面模式: single / triple / none', 'single')
   .option('--first-publish', '勾选"头条首发"')
   .option('--collection <name>', '添加至合集名称')

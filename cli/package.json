@@ -1,6 +1,6 @@
 {
   "name": "@openclaw-cn/toutiao-ops",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "今日头条创作者平台运营自动化 CLI — 支持多账号管理、文章/视频/微头条发布、评论管理、数据分析、创作灵感获取",
   "keywords": [

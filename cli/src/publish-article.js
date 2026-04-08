@@ -13,7 +13,7 @@ const TITLE_MIN_LEN = 2;
  *   --title          文章标题（必填）
  *   --content        正文文本
  *   --content-file   从文件读取正文
- *   --cover          封面图片路径（单图模式）
+ *   --cover          封面图片路径（必填，单图模式）
  *   --cover-mode     封面模式: single / triple / none（默认 single）
  *   --first-publish  勾选"头条首发"
  *   --collection     添加至合集名称
